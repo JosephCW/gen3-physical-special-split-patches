@@ -1,0 +1,4193 @@
+diff --git a/.gitignore b/.gitignore
+index a63741f1327b73096c378f82bcfd4b0747ca52c6..178a301c32df85ca7a51c3be1c297696fe994375 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -45,3 +45,7 @@ prefabs.json
+ /pokeemerald-*.png
+ /pokeemerald_modern-*.png
+ .porydaw/
++
++# phys/spec split patch tooling
++*.gba.verify
++patch_tools/visual_test/out/
+diff --git a/graphics/types/split_physical.png b/graphics/types/split_physical.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..1f7d92a92de3afe60b0978ac27dc75731683c207
+GIT binary patch
+literal 219
+zcmeAS@N?(olHy`uVBq!ia0vp^3P3Et!VDx^^%AmxltF+`h%1o(f7S3?v*A%g&1Xlm
+z_AasP&NBS}zk1D@>U;N&7Dst`Ia==Bdljgxxw`oO|NkCw+!8=enx~6nNX4zxen+kb
+z10I&<aC^mH%*7(N^tt6~&)u6Wud*#;>J`Q5JZ~lmeB~)lSk%g_UFa@)Gci)MPwmL6
+zfQ@Pe+)K=r-Wf6lOI#99)ZS<mxZ$+2#GD-_%dQFXTR+-&v4ZW}{qN$7(_-BXdP6?}
+PZDjCt^>bP0l+XkKs`^le
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/types/split_special.png b/graphics/types/split_special.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..b2bc107a1635cc59569a3b84b04dd1b794f25407
+GIT binary patch
+literal 220
+zcmeAS@N?(olHy`uVBq!ia0vp^3P3Et!VDx^^%AmxltF+`h%1mjd-VUBDc_2t=44Iz
+zHs{{GtN-75SqA-&>i&Op%ao*~C5}t(HSe7=Wl3{&@&Et-cbFcu1?oxnba4!+xRu&(
+z&DY?-!J3(4E4nRV;rHze>Z+T!uS@&8K-lS!${&|~JlRRpT!kmUXb--!;)~duLyps!
+zHn@l<ehCYBd^ITR!@NWlnf?z7(LulNHmUXLPTyb<>QH#rquq6#ubaxY``@j7OmY%U
+Ts+ZRStz__Y^>bP0l+XkKR4`nu
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/types/split_status.png b/graphics/types/split_status.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..e78dc75111a1c88dce206003ca767715038be422
+GIT binary patch
+literal 226
+zcmeAS@N?(olHy`uVBq!ia0vp^3P3Et!VDx^^%AmxltF+`h%1o(f7S3?v*A%g&1Xlm
+z_AasP&NBS}zk1D@>U;N&7Dst`Ia==Bdljgxxw`oO|NkCw+!8=euBVG*NX4zxen+kY
+z1{^GVzg^n?J?cd}*P{3r%qo8y%Y6BcrrexRnxd#UYwKKB_Sl#bVSgqL?(pjsyy6XJ
+z?S=;}7}UCAw{QO16?G&bGV$b(vIC1B)w@<N?bU2n7f7CL;`I1yVp#gZy`r|K-`h(R
+W?kVoSb5a;+F@vY8pUXO@geCxa;8*<s
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics_file_rules.mk b/graphics_file_rules.mk
+index 0123417c2da94daf5b8dea2ca4b9551833f98d07..b9b11783c186eef6b1188b309bc4c9a038d9e4f6 100644
+--- a/graphics_file_rules.mk
++++ b/graphics_file_rules.mk
+@@ -15,6 +15,7 @@ TITLESCREENGFXDIR := graphics/title_screen
+ 
+ types := normal fight flying poison ground rock bug ghost steel mystery fire water grass electric psychic ice dragon dark
+ contest_types := cool beauty cute smart tough
++split_types := physical special status
+ 
+ 
+ 
+@@ -130,7 +131,7 @@ $(BTLANMSPRGFXDIR)/spark.4bpp: $(BTLANMSPRGFXDIR)/spark_0.4bpp \
+                                $(BTLANMSPRGFXDIR)/spark_1.4bpp
+ 	@cat $^ >$@
+ 
+-$(TYPESGFXDIR)/move_types.4bpp: $(types:%=$(TYPESGFXDIR)/%.4bpp) $(contest_types:%=$(TYPESGFXDIR)/contest_%.4bpp)
++$(TYPESGFXDIR)/move_types.4bpp: $(types:%=$(TYPESGFXDIR)/%.4bpp) $(contest_types:%=$(TYPESGFXDIR)/contest_%.4bpp) $(split_types:%=$(TYPESGFXDIR)/split_%.4bpp)
+ 	@cat $^ >$@
+ 
+ $(TYPESGFXDIR)/move_types.gbapal: $(TYPESGFXDIR)/move_types_1.gbapal \
+diff --git a/include/battle.h b/include/battle.h
+index 62b584a7d788a6a7b9bad6df1db35702c81c7e78..42c16a058ba9ff29052fef344bb17ce847539dba 100644
+--- a/include/battle.h
++++ b/include/battle.h
+@@ -463,8 +463,9 @@ STATIC_ASSERT(sizeof(((struct BattleStruct *)0)->palaceFlags) * 8 >= MAX_BATTLER
+         typeArg = gBattleMoves[move].type;                            \
+ }
+ 
+-#define IS_TYPE_PHYSICAL(moveType) (moveType < TYPE_MYSTERY)
+-#define IS_TYPE_SPECIAL(moveType) (moveType > TYPE_MYSTERY)
++// Physical/special is decided per move (Gen 4 split) instead of by type
++#define IS_MOVE_PHYSICAL(move)(gBattleMoves[move].split == SPLIT_PHYSICAL)
++#define IS_MOVE_SPECIAL(move)(gBattleMoves[move].split == SPLIT_SPECIAL)
+ 
+ #define TARGET_TURN_DAMAGED ((gSpecialStatuses[gBattlerTarget].physicalDmg != 0 || gSpecialStatuses[gBattlerTarget].specialDmg != 0))
+ 
+diff --git a/include/item_menu.h b/include/item_menu.h
+index e63eb3b6c2ca9281481f6a8a0f1afe066a8a324b..c3e51006551d244829194e832980c5ee2f53232a 100644
+--- a/include/item_menu.h
++++ b/include/item_menu.h
+@@ -81,6 +81,8 @@ struct BagMenu
+     u8 unused2[14];
+     u8 ALIGNED(4) pocketNameBuffer[32][32];
+     u8 unused3[4];
++    u16 tmMove; // move of the selected TM/HM, shown as type + physical/special/status icons (MOVE_NONE = hidden)
++    u8 tmIconSpriteIds[2];
+ };
+ 
+ extern struct BagMenu *gBagMenu;
+diff --git a/include/pokemon.h b/include/pokemon.h
+index 1794ab37c1d690eb746382aa6c1662ce3792516c..2c595da0d01e9cc942b14bd0c43973ec5020ef8a 100644
+--- a/include/pokemon.h
++++ b/include/pokemon.h
+@@ -324,6 +324,11 @@ struct SpeciesInfo
+             u8 noFlip : 1;
+ };
+ 
++// Move damage categories (Gen 4 physical/special split)
++#define SPLIT_PHYSICAL 0
++#define SPLIT_SPECIAL  1
++#define SPLIT_STATUS   2
++
+ struct BattleMove
+ {
+     u8 effect;
+@@ -335,6 +340,7 @@ struct BattleMove
+     u8 target;
+     s8 priority;
+     u8 flags;
++    u8 split;
+ };
+ 
+ #define SPINDA_SPOT_WIDTH 16
+diff --git a/include/pokemon_summary_screen.h b/include/pokemon_summary_screen.h
+index df9e477524a28dc9e82262d946f9181f8c4aec32..a8333c30a364332413b164b0d52858ad39b278de 100755
+--- a/include/pokemon_summary_screen.h
++++ b/include/pokemon_summary_screen.h
+@@ -2,6 +2,17 @@
+ #define GUARD_POKEMON_SUMMARY_SCREEN_H
+ 
+ #include "main.h"
++#include "sprite.h"
++
++// Move type icon sprites (32x16), shared with the bag's TM pocket. Sheet frames are the
++// types, then the contest categories, then the physical/special/status icons.
++#define TAG_MOVE_TYPES 30002
++#define SPLIT_ICON_FRAME(split) (NUMBER_OF_MON_TYPES + CONTEST_CATEGORIES_COUNT + (split))
++#define MOVE_TYPE_SPRITE_FRAMES SPLIT_ICON_FRAME(SPLIT_STATUS + 1)
++extern const struct OamData gOamData_MoveTypes;
++extern const union AnimCmd *const gSpriteAnimTable_MoveTypes[];
++extern const struct CompressedSpriteSheet gSpriteSheet_MoveTypes;
++extern const u8 gMoveTypeToOamPaletteNum[]; // OBJ palette 13-15 used by each frame
+ 
+ extern u8 gLastViewedMonIndex;
+ 
+diff --git a/patch_tools/bps.py b/patch_tools/bps.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..1a35601b4bc91ad9a4ec81d371f7c83d2ad37822
+--- /dev/null
++++ b/patch_tools/bps.py
+@@ -0,0 +1,199 @@
++#!/usr/bin/env python3
++"""Minimal BPS patch creator / applier (no dependencies).
++
++  python3 bps.py create  original.gba modified.gba out.bps
++  python3 bps.py apply   original.gba patch.bps   out.gba
++
++BPS is the standard ROM-hacking patch format (used by Flips, Rom Patcher JS,
++mGBA, ...). A BPS file describes how to build the modified ROM ("target") out of
++the original ROM ("source") with four kinds of instructions:
++
++  SourceRead   copy bytes from the source at the *same* position we're writing to
++  TargetRead   bytes stored literally in the patch (new data)
++  SourceCopy   copy bytes from somewhere else in the source (for data that moved)
++  TargetCopy   copy bytes from earlier in the target (for repeated data)
++
++It also stores CRC32 checksums of the source, the target and the patch itself.
++That's how a patcher knows you gave it the wrong ROM (e.g. v1.1 instead of v1.0).
++
++Recompiling the game shifts lots of code and data around, so most of the target
++is "the same bytes as the source, a little further along". SourceCopy covers that
++cheaply, which keeps the patch to a few hundred KB.
++"""
++import sys, zlib
++
++# Instruction types (stored in the low 2 bits of each instruction number)
++SOURCE_READ, TARGET_READ, SOURCE_COPY, TARGET_COPY = range(4)
++MIN_MATCH = 16  # shortest run worth looking up in the index (and the index key length)
++STEP = 8        # index every 8th source position (keeps memory use reasonable for a 16 MB ROM)
++
++
++def enc_num(n):
++    """Encode a non-negative integer as a BPS variable-length number.
++
++    7 bits per byte, least significant first; the high bit marks the last byte.
++    BPS also subtracts 1 after each continuation byte so every value has exactly
++    one encoding.
++    """
++    out = bytearray()
++    while True:
++        x = n & 0x7f
++        n >>= 7
++        if n == 0:
++            out.append(0x80 | x)
++            return out
++        out.append(x)
++        n -= 1
++
++
++def dec_num(data, pos):
++    """Decode a BPS variable-length number at data[pos]. Returns (value, new_pos)."""
++    n, shift = 0, 1
++    while True:
++        x = data[pos]; pos += 1
++        n += (x & 0x7f) * shift
++        if x & 0x80:
++            return n, pos
++        shift <<= 7
++        n += shift
++
++
++def enc_signed(n):
++    """Encode a signed offset: magnitude shifted left one, with the sign in bit 0."""
++    return enc_num((abs(n) << 1) | (1 if n < 0 else 0))
++
++
++def create(src, tgt, metadata=b''):
++    """Build a BPS patch that turns `src` into `tgt`."""
++    # Index of the source: 16-byte chunk -> first position it appears at (every STEP bytes).
++    # Used to find where a piece of the target came from in the source.
++    index = {}
++    for p in range(0, len(src) - MIN_MATCH, STEP):
++        index.setdefault(src[p:p + MIN_MATCH], p)
++
++    # Header: magic, source size, target size, metadata
++    out = bytearray(b'BPS1')
++    out += enc_num(len(src)) + enc_num(len(tgt)) + enc_num(len(metadata)) + metadata
++    src_rel = 0          # SourceCopy offsets are relative to where the last one finished
++    literal_start = None  # start of a run of bytes we couldn't match (written as TargetRead)
++    t = 0                # current position in the target
++    n = len(tgt)
++
++    def flush_literal(end):
++        """Write any pending unmatched bytes as one TargetRead instruction."""
++        nonlocal literal_start
++        if literal_start is not None:
++            ln = end - literal_start
++            out.extend(enc_num(((ln - 1) << 2) | TARGET_READ))
++            out.extend(tgt[literal_start:end])
++            literal_start = None
++
++    def match_len(sp, tp):
++        """How many bytes match between src[sp:] and tgt[tp:]."""
++        ln = 0
++        while tp + ln < n and sp + ln < len(src) and src[sp + ln] == tgt[tp + ln]:
++            ln += 1
++        return ln
++
++    last_delta = 0  # source-minus-target offset of the last SourceCopy (data tends to shift in blocks)
++    while t < n:
++        # Try three ways to find the bytes at target position t in the source,
++        # cheapest first, and keep the longest match.
++        best_kind, best_len, best_sp = None, 0, 0
++        # 1. Unchanged at the same position (SourceRead)
++        if t < len(src):
++            ln = match_len(t, t)
++            if ln >= 4:
++                best_kind, best_len = SOURCE_READ, ln
++        # 2. Shifted by the same amount as the previous copy
++        if best_len < MIN_MATCH:
++            sp = t + last_delta
++            if 0 <= sp < len(src):
++                ln = match_len(sp, t)
++                if ln > best_len and ln >= 8:
++                    best_kind, best_len, best_sp = SOURCE_COPY, ln, sp
++        # 3. Look it up in the index. The index only has every STEP-th source
++        #    position, so try target offsets t..t+7 to line up with one of them.
++        if best_len < MIN_MATCH:
++            for k in range(STEP):
++                key = tgt[t + k:t + k + MIN_MATCH]
++                sp = index.get(key)
++                if sp is not None and sp - k >= 0:
++                    ln = match_len(sp - k, t)
++                    if ln > best_len and ln >= MIN_MATCH:
++                        best_kind, best_len, best_sp = SOURCE_COPY, ln, sp - k
++        if best_kind is None:
++            # No match: this byte is new data; add it to the pending literal run
++            if literal_start is None:
++                literal_start = t
++            t += 1
++            continue
++        flush_literal(t)
++        # Each instruction number is (length - 1) << 2 | type
++        if best_kind == SOURCE_READ:
++            out.extend(enc_num(((best_len - 1) << 2) | SOURCE_READ))
++        else:
++            out.extend(enc_num(((best_len - 1) << 2) | SOURCE_COPY))
++            out.extend(enc_signed(best_sp - src_rel))
++            src_rel = best_sp + best_len
++            last_delta = best_sp - t
++        t += best_len
++    flush_literal(n)
++
++    # Footer: CRC32 of source, target, and of the patch so far
++    out += zlib.crc32(src).to_bytes(4, 'little')
++    out += zlib.crc32(tgt).to_bytes(4, 'little')
++    out += zlib.crc32(out).to_bytes(4, 'little')
++    return bytes(out)
++
++
++def apply(src, patch):
++    """Apply a BPS patch to `src` and return the patched ROM, checking all checksums."""
++    if patch[:4] != b'BPS1':
++        raise ValueError('not a BPS patch')
++    # The last 12 bytes are: source CRC, target CRC, patch CRC
++    if zlib.crc32(patch[:-4]) != int.from_bytes(patch[-4:], 'little'):
++        raise ValueError('patch file is corrupt')
++    if zlib.crc32(src) != int.from_bytes(patch[-12:-8], 'little'):
++        raise ValueError('wrong source ROM (CRC32 mismatch) - check game version/revision')
++    pos = 4
++    src_size, pos = dec_num(patch, pos)
++    tgt_size, pos = dec_num(patch, pos)
++    meta_size, pos = dec_num(patch, pos)
++    pos += meta_size  # metadata is free text; skip it
++    tgt = bytearray(tgt_size)
++    out = src_rel = tgt_rel = 0  # write position, and the two relative read cursors
++    end = len(patch) - 12
++    while pos < end:
++        data, pos = dec_num(patch, pos)
++        cmd, ln = data & 3, (data >> 2) + 1
++        if cmd == SOURCE_READ:
++            tgt[out:out + ln] = src[out:out + ln]
++        elif cmd == TARGET_READ:
++            tgt[out:out + ln] = patch[pos:pos + ln]; pos += ln
++        else:
++            # SourceCopy / TargetCopy: move the read cursor by a signed offset, then copy
++            d, pos = dec_num(patch, pos)
++            d = -(d >> 1) if d & 1 else d >> 1
++            if cmd == SOURCE_COPY:
++                src_rel += d
++                tgt[out:out + ln] = src[src_rel:src_rel + ln]; src_rel += ln
++            else:
++                # TargetCopy may overlap what it's writing, so copy byte by byte
++                tgt_rel += d
++                for i in range(ln):
++                    tgt[out + i] = tgt[tgt_rel]; tgt_rel += 1
++        out += ln
++    if zlib.crc32(tgt) != int.from_bytes(patch[-8:-4], 'little'):
++        raise ValueError('output CRC32 mismatch')
++    return bytes(tgt)
++
++
++if __name__ == '__main__':
++    if len(sys.argv) != 5 or sys.argv[1] not in ('create', 'apply'):
++        sys.exit(__doc__)
++    a = open(sys.argv[2], 'rb').read()
++    b = open(sys.argv[3], 'rb').read()
++    result = create(a, b) if sys.argv[1] == 'create' else apply(a, b)
++    open(sys.argv[4], 'wb').write(result)
++    print('wrote %s (%d bytes)' % (sys.argv[4], len(result)))
+diff --git a/patch_tools/make_patches.sh b/patch_tools/make_patches.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..ce52fd06fc0bde2c49419f9fdf69a05282f57562
+--- /dev/null
++++ b/patch_tools/make_patches.sh
+@@ -0,0 +1,54 @@
++#!/usr/bin/env bash
++# Rebuilds the modified ROMs from this source tree and regenerates the .bps
++# patches in patches/.
++#
++#   patch_tools/make_patches.sh <clean ROM> [<clean ROM> ...]
++#
++# Pass the clean Emerald (USA, Europe) ROM. It is identified by its SHA1
++# (checked against the decomp's rom.sha1), and the patch is rebuilt:
++#
++#   Emerald -> patches/Emerald_PhysSpecSplit.bps
++#
++# The ROMs are built in a fresh temporary copy of this source tree (with all
++# build outputs and generated graphics removed), so leftovers from earlier
++# builds can never end up in a patch. The built ROMs are copied back to the
++# repository root.
++set -euo pipefail
++REPO="$(cd "$(dirname "$0")/.." && pwd)"
++cd "$REPO"
++[ $# -ge 1 ] || { echo "usage: $0 <clean Emerald ROM> [...]"; exit 1; }
++
++# make target | sha1 file | ROM the build writes | patch file
++GAMES="
++all            rom.sha1            pokeemerald.gba         Emerald_PhysSpecSplit.bps"
++
++mkdir -p patches
++WORK="$(mktemp -d)"
++trap 'rm -rf "$WORK"' EXIT
++echo "== copying source to a clean build directory"
++rsync -a --exclude /build --exclude '/*.gba' --exclude '/*.elf' --exclude /patch_tools/visual_test/out "$REPO/" "$WORK/repo/"
++(cd "$WORK/repo" && git clean -fdXq)                        # drop every git-ignored file (build outputs, generated graphics, tools)
++rsync -a "$REPO/tools/agbcc/" "$WORK/repo/tools/agbcc/"     # ...but keep the installed compiler
++
++for clean in "$@"; do
++    have=$(shasum "$clean" | cut -d' ' -f1)
++    found=""
++    while read -r target sha_file built out; do
++        [ -n "$target" ] || continue
++        if [ "$(cut -d' ' -f1 "$sha_file")" = "$have" ]; then
++            found=1
++            echo "== $clean is $target; building"
++            make -C "$WORK/repo" -j8 "$target" > "$WORK/build.log" 2>&1 || { tail -20 "$WORK/build.log"; exit 1; }
++            cp "$WORK/repo/$built" "$built"
++            python3 -I patch_tools/bps.py create "$clean" "$built" "patches/$out"
++            # Make sure the patch rebuilds the modified ROM exactly
++            python3 -I patch_tools/bps.py apply "$clean" "patches/$out" "$WORK/verify.gba"
++            cmp "$built" "$WORK/verify.gba"
++            echo "== patches/$out OK"
++        fi
++    done <<< "$GAMES"
++    if [ -z "$found" ]; then
++        echo "error: $clean is not a supported clean ROM (sha1 $have)"
++        exit 1
++    fi
++done
+diff --git a/patch_tools/visual_test/gdb_dump.py b/patch_tools/visual_test/gdb_dump.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..3a892a225b1c5e632552066cc82468c04bdbe820
+--- /dev/null
++++ b/patch_tools/visual_test/gdb_dump.py
+@@ -0,0 +1,87 @@
++#!/usr/bin/env python3
++"""Connect to mGBA's GDB stub, stop at each TestDumpPoint() call and dump
++IO regs + palette + VRAM + OAM to <outdir>/dump_<id>.bin.
++
++  python3 gdb_dump.py <TestDumpPoint address hex> <outdir> <count> [<sGpuRegBuffer address hex>]
++
++How it fits together:
++  * The test build (harness.diff) calls TestDumpPoint(id) once each screen is
++    ready to check.
++  * mGBA started with `-g` waits for a debugger on TCP port 2345, speaking the
++    GDB Remote Serial Protocol.
++  * This script is a tiny GDB client. It sets a breakpoint on TestDumpPoint, lets
++    the game run, and at each stop copies the display memory out.
++    render_gba.py then turns each dump into a PNG.
++  * Some display registers (the background scroll offsets) are write-only on
++    real hardware and read back as junk. If the address of the game's
++    sGpuRegBuffer (its copy of every display register it writes) is given, the
++    registers are read from there instead. Without it (Ruby/Sapphire has no such
++    buffer) the scroll offsets are recorded as 0, which is right for static menus.
++"""
++import socket, sys, time, os
++
++bp, outdir, count = int(sys.argv[1], 16), sys.argv[2], int(sys.argv[3])
++regs_addr = int(sys.argv[4], 16) if len(sys.argv) > 4 else 0x04000000
++os.makedirs(outdir, exist_ok=True)
++
++# mGBA takes a moment to start listening, so retry the connection for up to 30 s
++for _ in range(60):
++    try:
++        s = socket.create_connection(('127.0.0.1', 2345))
++        break
++    except OSError:
++        time.sleep(0.5)
++s.settimeout(300)  # emulation is slow under the debugger; allow time to reach each screen
++buf = b''          # bytes received but not yet parsed
++
++
++def recv_packet():
++    """Read one GDB reply packet: `$<payload>#<2-digit checksum>`. Returns the payload."""
++    global buf
++    while True:
++        i = buf.find(b'$')
++        if i >= 0:
++            j = buf.find(b'#', i)
++            if j >= 0 and len(buf) >= j + 3:
++                pkt = buf[i + 1:j]
++                buf = buf[j + 3:]
++                s.sendall(b'+')  # acknowledge
++                return pkt.decode()
++        d = s.recv(65536)
++        if not d:
++            raise EOFError
++        buf += d
++
++
++def cmd(c, reply=True):
++    """Send one GDB command packet (payload + checksum = sum of bytes mod 256) and wait for the reply."""
++    p = c.encode()
++    s.sendall(b'$' + p + b'#' + b'%02x' % (sum(p) & 255))
++    return recv_packet() if reply else None
++
++
++def mem(addr, n):
++    """Read n bytes of GBA memory with `m<addr>,<len>` (reply is hex), 256 bytes per request."""
++    out = b''
++    while n:
++        k = min(n, 0x100)  # mGBA's stub rejects much larger reads
++        out += bytes.fromhex(cmd('m%x,%x' % (addr, k)))
++        addr += k
++        n -= k
++    return out
++
++
++cmd('?')                   # ask why the target is stopped (also completes the handshake)
++cmd('Z0,%x,2' % bp)        # breakpoint at TestDumpPoint; kind 2 = 16-bit Thumb instruction
++for _ in range(count):
++    cmd('c')               # continue; returns when the breakpoint is hit
++    regs = cmd('g')        # all registers as hex, r0 first (8 hex digits, little-endian, each)
++    dump_id = int.from_bytes(bytes.fromhex(regs[:8]), 'little')  # r0 = the id argument
++    print('dump point', dump_id, flush=True)
++    io = mem(regs_addr, 0x60)
++    if regs_addr == 0x04000000:
++        io = io[:0x10] + bytes(0x10) + io[0x20:]  # BGxHOFS/VOFS can't be read back; assume 0
++    with open('%s/dump_%d.bin' % (outdir, dump_id), 'wb') as f:
++        # Same layout render_gba.py expects: IO regs, palette RAM, VRAM, OAM
++        f.write(io + mem(0x05000000, 0x400) + mem(0x06000000, 0x18000) + mem(0x07000000, 0x400))
++cmd('D', reply=False)      # detach; the script then closes mGBA
+diff --git a/patch_tools/visual_test/harness.diff b/patch_tools/visual_test/harness.diff
+new file mode 100644
+index 0000000000000000000000000000000000000000..25fe886b39f4cb978566c8e9cd44802b872e3955
+--- /dev/null
++++ b/patch_tools/visual_test/harness.diff
+@@ -0,0 +1,161 @@
++diff --git a/src/main.c b/src/main.c
++index 2a47ec5..3898ce0 100644
++--- a/src/main.c
+++++ b/src/main.c
++@@ -247,9 +247,113 @@ void InitKeys(void)
++     gMain.newKeysRaw = 0;
++ }
++ 
+++// ---- split test harness ----
+++#include "malloc.h"
+++#include "pokemon_summary_screen.h"
+++#include "string_util.h"
+++#include "battle.h"
+++#include "event_data.h"
+++#include "constants/moves.h"
+++#include "constants/species.h"
+++#include "constants/region_map_sections.h"
+++extern void CB2_InitLearnMove(void);
+++u32 gTestDumpId;
+++static u32 sTestFrame;
+++static bool8 sTestStarted;
+++void TestDumpPoint(u32 id)
+++{
+++    gTestDumpId = id;
+++}
+++static void CB2_TestRelearner(void)
+++{
+++    gSpecialVar_0x8004 = 0;
+++    SetMainCallback2(CB2_InitLearnMove);
+++}
+++static void CB2_TestSelectMove(void)
+++{
+++    ShowSelectMovePokemonSummaryScreen(gPlayerParty, 0, 0, CB2_TestRelearner, MOVE_EARTHQUAKE);
+++}
+++s32 gTestDmg[4];
+++// Attack 200 / Sp. Atk 50 vs Defense 100 / Sp. Def 100, all level 50
+++static void TestDamage(void)
+++{
+++    static const u16 moves[4] = {MOVE_BITE, MOVE_SHADOW_BALL, MOVE_FIRE_PUNCH, MOVE_FLAMETHROWER};
+++    struct BattlePokemon atk, def;
+++    u32 i;
+++    memset(&atk, 0, sizeof(atk));
+++    memset(&def, 0, sizeof(def));
+++    atk.level = def.level = 50;
+++    atk.attack = 200; atk.spAttack = 50;
+++    def.defense = 100; def.spDefense = 100;
+++    atk.maxHP = atk.hp = def.maxHP = def.hp = 200;
+++    for (i = 0; i < 8; i++)
+++        atk.statStages[i] = def.statStages[i] = 6;
+++    gBattleTypeFlags = 0;
+++    gCritMultiplier = 1;
+++    for (i = 0; i < 4; i++)
+++    {
+++        gCurrentMove = moves[i];
+++        gTestDmg[i] = CalculateBaseDamage(&atk, &def, moves[i], 0, 0, 0, 0, 1);
+++    }
+++}
+++void TestSplitSetup(void)
+++{
+++    static const u8 sName[] = _("RED");
+++    u8 metLoc = MAPSEC_LITTLEROOT_TOWN;
+++    TestDamage();
+++    StringCopy(gSaveBlock2Ptr->playerName, sName);
+++    ZeroPlayerPartyMons();
+++    CreateMon(&gPlayerParty[0], SPECIES_CHARIZARD, 60, 31, FALSE, 0, OT_ID_PLAYER_ID, 0);
+++    SetMonMoveSlot(&gPlayerParty[0], MOVE_FLAMETHROWER, 0);
+++    SetMonMoveSlot(&gPlayerParty[0], MOVE_SLASH, 1);
+++    SetMonMoveSlot(&gPlayerParty[0], MOVE_SCARY_FACE, 2);
+++    SetMonMoveSlot(&gPlayerParty[0], MOVE_SHADOW_BALL, 3);
+++    SetMonData(&gPlayerParty[0], MON_DATA_MET_LOCATION, &metLoc);
+++    CalculatePlayerPartyCount();
+++    sTestFrame = 0;
+++    sTestStarted = TRUE;
+++    gMain.state = 0;
+++    ShowPokemonSummaryScreen(SUMMARY_MODE_NORMAL, gPlayerParty, 0, 0, CB2_TestSelectMove);
+++}
+++static const u16 sTestScript[][2] = {
+++    // {frame, key}; key >= 1000 means "dump point (key - 1000)"
+++    {150, DPAD_RIGHT}, {210, DPAD_RIGHT}, {270, A_BUTTON},
+++    {340, 1001}, {350, DPAD_DOWN}, {400, 1002}, {410, DPAD_DOWN}, {460, 1003},
+++    {470, DPAD_DOWN}, {520, 1004}, {525, DPAD_RIGHT}, {565, 1010}, {575, B_BUTTON}, {620, B_BUTTON},
+++    {760, 1005}, {770, DPAD_DOWN}, {800, DPAD_DOWN}, {830, DPAD_DOWN}, {860, DPAD_DOWN}, {920, 1006},
+++    {930, B_BUTTON}, {1150, 1007}, {1160, DPAD_DOWN}, {1220, 1008}, {1230, DPAD_DOWN}, {1290, 1009},
+++    {1300, DPAD_RIGHT}, {1360, 1011}, {1370, DPAD_LEFT}, {1430, 1012},
+++};
+++static u16 TestInjectKeys(void)
+++{
+++    u32 i;
+++    u16 keys = 0;
+++    sTestFrame++;
+++    if (!sTestStarted)
+++    {
+++        // Mash through intro, title screen and main menu until NEW GAME is chosen
+++        if (sTestFrame % 60 < 2)
+++            return (sTestFrame % 120 < 60) ? A_BUTTON : START_BUTTON;
+++        return 0;
+++    }
+++    for (i = 0; i < ARRAY_COUNT(sTestScript); i++)
+++    {
+++        if (sTestScript[i][1] >= 1000)
+++        {
+++            if (sTestFrame == sTestScript[i][0])
+++                TestDumpPoint(sTestScript[i][1] - 1000);
+++        }
+++        else if (sTestFrame >= sTestScript[i][0] && sTestFrame < sTestScript[i][0] + 3)
+++        {
+++            keys |= sTestScript[i][1];
+++        }
+++    }
+++    return keys;
+++}
+++
++ static void ReadKeys(void)
++ {
++-    u16 keyInput = REG_KEYINPUT ^ KEYS_MASK;
+++    u16 keyInput = (REG_KEYINPUT ^ KEYS_MASK) | TestInjectKeys();
++     gMain.newKeysRaw = keyInput & ~gMain.heldKeysRaw;
++     gMain.newKeys = gMain.newKeysRaw;
++     gMain.newAndRepeatedKeys = gMain.newKeysRaw;
++diff --git a/src/main_menu.c b/src/main_menu.c
++index 45fa12c..95e2d82 100644
++--- a/src/main_menu.c
+++++ b/src/main_menu.c
++@@ -1057,9 +1057,12 @@ static void Task_HandleMainMenuAPressed(u8 taskId)
++         {
++             case ACTION_NEW_GAME:
++             default:
++-                gPlttBufferUnfaded[0] = RGB_BLACK;
++-                gPlttBufferFaded[0] = RGB_BLACK;
++-                gTasks[taskId].func = Task_NewGameBirchSpeech_Init;
+++                {
+++                    extern void TestSplitSetup(void);
+++                    DestroyTask(taskId);
+++                    FreeAllWindowBuffers();
+++                    TestSplitSetup();
+++                }
++                 break;
++             case ACTION_CONTINUE:
++                 gPlttBufferUnfaded[0] = RGB_BLACK;
++diff --git a/src/move_relearner.c b/src/move_relearner.c
++index d5f6c08..0e2a609 100644
++--- a/src/move_relearner.c
+++++ b/src/move_relearner.c
++@@ -351,7 +351,7 @@ static void CreateLearnableMovesList(void);
++ static void CreateUISprites(void);
++ static void CB2_MoveRelearnerMain(void);
++ static void Task_WaitForFadeOut(u8 taskId);
++-static void CB2_InitLearnMove(void);
+++void CB2_InitLearnMove(void);
++ static void CB2_InitLearnMoveReturnFromSelectMove(void);
++ static void InitMoveRelearnerBackgroundLayers(void);
++ static void AddScrollArrows(void);
++@@ -388,7 +388,7 @@ static void Task_WaitForFadeOut(u8 taskId)
++     }
++ }
++ 
++-static void CB2_InitLearnMove(void)
+++void CB2_InitLearnMove(void)
++ {
++     ResetSpriteData();
++     FreeAllSpritePalettes();
+diff --git a/patch_tools/visual_test/render_gba.py b/patch_tools/visual_test/render_gba.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..682b5e23062230cdc37bc982f521a5b7ecdb2bed
+--- /dev/null
++++ b/patch_tools/visual_test/render_gba.py
+@@ -0,0 +1,171 @@
++#!/usr/bin/env python3
++"""Render one GBA screen to a PNG from a raw memory dump.
++
++  python3 render_gba.py dump_N.bin out.png
++
++The dump (written by gdb_dump.py) is these GBA memory regions back to back:
++    0x60    bytes of I/O registers   (display control, background settings, scroll)
++    0x400   bytes of palette RAM     (512 colours: 256 for backgrounds, 256 for sprites)
++    0x18000 bytes of VRAM            (tile graphics + tilemaps, sprite graphics at +0x10000)
++    0x400   bytes of OAM             (128 sprite entries)
++
++It redraws the frame the way the GBA would in "mode 0" (four tiled background
++layers plus sprites). It's a simple software renderer: it ignores colour
++blending, windows (masking) and sprite rotation/scaling. Pokemon menus barely use
++those, so the result is close enough to check the UI. A stray magenta border or a
++slightly offset cursor are renderer artefacts, not bugs in the game.
++"""
++import sys, struct, zlib
++
++d = open(sys.argv[1], 'rb').read()
++# Split the dump back into the four memory regions (see layout above)
++io, pal, vram, oam = d[:0x60], d[0x60:0x460], d[0x460:0x18460], d[0x18460:0x18860]
++
++
++def r16(buf, offset):
++    """Read a little-endian 16-bit value."""
++    return struct.unpack_from('<H', buf, offset)[0]
++
++
++def color(i):
++    """Palette entry i -> (r, g, b). GBA colours are 15-bit BGR555, so scale 5-bit channels to 8-bit."""
++    c = r16(pal, i * 2)
++    return ((c & 31) << 3, (c >> 5 & 31) << 3, (c >> 10 & 31) << 3)
++
++
++dispcnt = r16(io, 0)  # DISPCNT: which layers are switched on, sprite tile mapping mode
++W, H = 240, 160       # GBA screen size
++
++# Start with every pixel set to the backdrop colour (palette entry 0)
++img = [[color(0)] * W for _ in range(H)]
++
++# --- Work out the drawing order -------------------------------------------
++# Every background and sprite has a priority 0-3 (0 = in front). Within one
++# priority, sprites go in front of backgrounds, lower-numbered backgrounds go in
++# front of higher-numbered ones, and lower-numbered sprites go in front of
++# higher-numbered ones. Build a list of (priority, tie-break, kind, params) and
++# sort it back-to-front so we can just paint over in order.
++layers = []
++for bg in range(4):
++    if not dispcnt & (0x100 << bg):          # DISPCNT bits 8-11 enable BG0-BG3
++        continue
++    cnt = r16(io, 8 + bg * 2)                # BGxCNT: priority, tile/map base, colour depth, size
++    hofs = r16(io, 0x10 + bg * 4) & 511      # BGxHOFS: horizontal scroll
++    vofs = r16(io, 0x12 + bg * 4) & 511      # BGxVOFS: vertical scroll
++    layers.append((cnt & 3, -10 + bg, 'bg', (cnt, hofs, vofs)))
++if dispcnt & 0x1000:                         # DISPCNT bit 12 enables sprites
++    for n in range(127, -1, -1):
++        a0, a1, a2 = struct.unpack_from('<HHH', oam, n * 8)  # each OAM entry is 3 attributes + 1 unused
++        if (a0 >> 8 & 3) == 2:               # attr0 bits 8-9 == 2 means "sprite disabled"
++            continue
++        layers.append((a2 >> 10 & 3, -20 - n, 'obj', (a0, a1, a2)))
++layers.sort(key=lambda l: (-l[0], -l[1]))    # back-most first
++
++# Sprite pixel size, looked up by (shape, size) from attr0 bits 14-15 and attr1 bits 14-15
++SPRITE_SIZES = {
++    (0, 0): (8, 8),   (0, 1): (16, 16), (0, 2): (32, 32), (0, 3): (64, 64),   # square
++    (1, 0): (16, 8),  (1, 1): (32, 8),  (1, 2): (32, 16), (1, 3): (64, 32),   # wide
++    (2, 0): (8, 16),  (2, 1): (8, 32),  (2, 2): (16, 32), (2, 3): (32, 64),   # tall
++}
++
++for _, _, kind, p in layers:
++    if kind == 'bg':
++        # --- Tiled background layer --------------------------------------
++        cnt, hofs, vofs = p
++        char_base = (cnt >> 2 & 3) * 0x4000   # where this layer's 8x8 tile graphics start in VRAM
++        screen_base = (cnt >> 8 & 31) * 0x800  # where its tilemap (which tile goes where) starts
++        bpp8 = cnt >> 7 & 1                   # 0 = 16-colour tiles (4bpp), 1 = 256-colour tiles (8bpp)
++        size = cnt >> 14                      # map size: 256 or 512 pixels in each direction
++        map_w = 512 if size & 1 else 256
++        map_h = 512 if size & 2 else 256
++        for y in range(H):
++            for x in range(W):
++                # Screen pixel -> position on the (scrolled, wrapping) background map
++                X, Y = (x + hofs) % map_w, (y + vofs) % map_h
++                # Big maps are made of 256x256 blocks, each its own 32x32 tilemap
++                block = (X // 256) + (Y // 256) * (2 if map_w == 512 else 1)
++                # Tilemap entry: bits 0-9 tile number, 10 h-flip, 11 v-flip, 12-15 palette
++                entry = r16(vram, screen_base + block * 0x800 + ((Y % 256) // 8 * 32 + (X % 256) // 8) * 2)
++                tx, ty = X % 8, Y % 8                 # pixel position inside the 8x8 tile
++                if entry & 0x400:
++                    tx = 7 - tx
++                if entry & 0x800:
++                    ty = 7 - ty
++                tile = entry & 0x3ff
++                if bpp8:
++                    # 8bpp: one byte per pixel, 64 bytes per tile, index into the full 256-colour palette
++                    o = char_base + tile * 64 + ty * 8 + tx
++                    if o >= 0x10000:  # background tiles can't reach into sprite VRAM
++                        continue
++                    v = vram[o]
++                    ci = v
++                else:
++                    # 4bpp: two pixels per byte (low nibble first), 32 bytes per tile,
++                    # index into one of 16 sub-palettes chosen by the tilemap entry
++                    o = char_base + tile * 32 + ty * 4 + tx // 2
++                    if o >= 0x10000:
++                        continue
++                    v = (vram[o] >> (4 * (tx & 1))) & 15
++                    ci = (entry >> 12) * 16 + v
++                if v:  # colour 0 is transparent
++                    img[y][x] = color(ci)
++    else:
++        # --- Sprite (OBJ) -------------------------------------------------
++        a0, a1, a2 = p
++        w, h = SPRITE_SIZES.get((a0 >> 14, a1 >> 14), (8, 8))
++        oy, ox = a0 & 255, a1 & 511          # top-left position; values wrap, so convert to signed
++        if ox >= 256:
++            ox -= 512
++        if oy >= 160:
++            oy -= 256
++        affine = a0 >> 8 & 1                 # rotation/scaling sprite (drawn unrotated here)
++        if affine and a0 >> 9 & 1:           # "double size" affine sprites are offset by half their size
++            ox += w // 2
++            oy += h // 2
++        bpp8 = a0 >> 13 & 1
++        tile = a2 & 0x3ff                    # first tile of the sprite graphics
++        palno = a2 >> 12                     # 16-colour sub-palette (4bpp only)
++        hflip = (not affine) and a1 >> 12 & 1
++        vflip = (not affine) and a1 >> 13 & 1
++        one_d = dispcnt >> 6 & 1             # 1D mapping: a sprite's tiles are consecutive in VRAM;
++                                             # 2D mapping: VRAM is a 32-tile-wide grid
++        for yy in range(h):
++            for xx in range(w):
++                sx, sy = ox + xx, oy + yy
++                if not (0 <= sx < W and 0 <= sy < H):
++                    continue
++                tx = w - 1 - xx if hflip else xx
++                ty = h - 1 - yy if vflip else yy
++                # Sprite graphics live at VRAM + 0x10000 and use palette entries 256-511
++                if bpp8:
++                    # 8bpp tiles take two 32-byte tile slots each
++                    tn = tile + ((ty // 8) * (w // 8) * 2 if one_d else (ty // 8) * 32) + (tx // 8) * 2
++                    v = vram[0x10000 + (tn & 0x3ff) * 32 + (ty % 8) * 8 + tx % 8]
++                    ci = 256 + v
++                else:
++                    tn = tile + ((ty // 8) * (w // 8) if one_d else (ty // 8) * 32) + tx // 8
++                    b = vram[0x10000 + (tn & 0x3ff) * 32 + (ty % 8) * 4 + (tx % 8) // 2]
++                    v = (b >> (4 * (tx & 1))) & 15
++                    ci = 256 + palno * 16 + v
++                if v:  # colour 0 is transparent
++                    img[sy][sx] = color(ci)
++
++# --- Write the PNG (scaled up 3x so it's easy to see) ---------------------
++SCALE = 3
++# PNG image data: each row starts with a filter-type byte (0 = none), then RGB triples
++raw = b''.join(
++    b'\x00' + b''.join(bytes(img[y // SCALE][x // SCALE]) for x in range(W * SCALE))
++    for y in range(H * SCALE))
++
++
++def chunk(tag, data):
++    """One PNG chunk: length, 4-letter tag, data, CRC32 of tag+data."""
++    return struct.pack('>I', len(data)) + tag + data + struct.pack('>I', zlib.crc32(tag + data) & 0xffffffff)
++
++
++# IHDR = width, height, 8 bits per channel, colour type 2 (RGB), no interlace
++open(sys.argv[2], 'wb').write(
++    b'\x89PNG\r\n\x1a\n'
++    + chunk(b'IHDR', struct.pack('>IIBBBBB', W * SCALE, H * SCALE, 8, 2, 0, 0, 0))
++    + chunk(b'IDAT', zlib.compress(raw))
++    + chunk(b'IEND', b''))
+diff --git a/patch_tools/visual_test/run_visual_test.sh b/patch_tools/visual_test/run_visual_test.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..bfc783794641645cda9b47c4f1a1325df2020cc3
+--- /dev/null
++++ b/patch_tools/visual_test/run_visual_test.sh
+@@ -0,0 +1,31 @@
++#!/usr/bin/env bash
++# Builds a throwaway, self-driving copy of the modified game that opens the
++# summary screen / "forget a move" screen / Move Relearner, runs it in mGBA with
++# the GDB stub, and renders PNGs of each screen into patch_tools/visual_test/out/.
++# The real source tree is not touched.
++#
++#   patch_tools/visual_test/run_visual_test.sh
++set -euo pipefail
++REPO="$(cd "$(dirname "$0")/../.." && pwd)"
++HERE="$REPO/patch_tools/visual_test"
++MGBA="${MGBA:-/Applications/mGBA.app/Contents/MacOS/mGBA}"
++WORK="$(mktemp -d)"
++MGBA_PID=""
++trap 'kill $MGBA_PID 2>/dev/null || true; rm -rf "$WORK"' EXIT
++
++rsync -a --exclude /build --exclude '/*.gba' --exclude '/*.elf' --exclude /patch_tools/visual_test/out "$REPO/" "$WORK/repo/"
++cd "$WORK/repo"
++git apply "$HERE/harness.diff"
++make -j8 > build.log 2>&1 || { tail -20 build.log; exit 1; }
++
++BP=$(arm-none-eabi-nm pokeemerald.elf | awk '$3=="TestDumpPoint"{print $1}')
++REGS=$(arm-none-eabi-nm pokeemerald.elf | awk '$3=="sGpuRegBuffer"{print $1}')
++"$MGBA" -g pokeemerald.gba > /dev/null 2>&1 &
++MGBA_PID=$!
++rm -rf "$HERE/out"
++python3 -I "$HERE/gdb_dump.py" "$BP" "$HERE/out" 12 "$REGS"
++for f in "$HERE"/out/*.bin; do
++    python3 -I "$HERE/render_gba.py" "$f" "${f%.bin}.png"
++    rm "$f"
++done
++echo "Screens written to $HERE/out/"
+diff --git a/src/battle_script_commands.c b/src/battle_script_commands.c
+index 3af09ec7a281b99508f5e0170bb15f535d11df47..a47bd9d47dcb5ff7ce5c4c2dd1820c52cb7f25cb 100644
+--- a/src/battle_script_commands.c
++++ b/src/battle_script_commands.c
+@@ -1153,7 +1153,7 @@ static void Cmd_accuracycheck(void)
+             calc = (calc * 130) / 100; // 1.3 compound eyes boost
+         if (WEATHER_HAS_EFFECT && gBattleMons[gBattlerTarget].ability == ABILITY_SAND_VEIL && gBattleWeather & B_WEATHER_SANDSTORM)
+             calc = (calc * 80) / 100; // 1.2 sand veil loss
+-        if (gBattleMons[gBattlerAttacker].ability == ABILITY_HUSTLE && IS_TYPE_PHYSICAL(type))
++        if (gBattleMons[gBattlerAttacker].ability == ABILITY_HUSTLE && IS_MOVE_PHYSICAL(move))
+             calc = (calc * 80) / 100; // 1.2 hustle loss
+ 
+         if (gBattleMons[gBattlerTarget].item == ITEM_ENIGMA_BERRY)
+@@ -1935,7 +1935,7 @@ static void Cmd_datahpupdate(void)
+                 // Note: While physicalDmg/specialDmg below are only distinguished between for Counter/Mirror Coat, they are
+                 //       used in combination as general damage trackers for other purposes. specialDmg is additionally used
+                 //       to help determine if a fire move should defrost the target.
+-                if (IS_TYPE_PHYSICAL(moveType) && !(gHitMarker & HITMARKER_PASSIVE_HP_UPDATE) && gCurrentMove != MOVE_PAIN_SPLIT)
++                if (IS_MOVE_PHYSICAL(gCurrentMove) && !(gHitMarker & HITMARKER_PASSIVE_HP_UPDATE) && gCurrentMove != MOVE_PAIN_SPLIT)
+                 {
+                     // Record physical damage/attacker for Counter
+                     gProtectStructs[gActiveBattler].physicalDmg = gHpDealt;
+@@ -1951,7 +1951,7 @@ static void Cmd_datahpupdate(void)
+                         gSpecialStatuses[gActiveBattler].physicalBattlerId = gBattlerTarget;
+                     }
+                 }
+-                else if (!IS_TYPE_PHYSICAL(moveType) && !(gHitMarker & HITMARKER_PASSIVE_HP_UPDATE))
++                else if (IS_MOVE_SPECIAL(gCurrentMove) && !(gHitMarker & HITMARKER_PASSIVE_HP_UPDATE))
+                 {
+                     // Record special damage/attacker for Mirror Coat
+                     gProtectStructs[gActiveBattler].specialDmg = gHpDealt;
+diff --git a/src/battle_tv.c b/src/battle_tv.c
+index bf31f18f479597a5cc366fd2d18be2023b4517af..b54e655fd2d2cf231109dfc288dddd423af5a03d 100644
+--- a/src/battle_tv.c
++++ b/src/battle_tv.c
+@@ -1010,8 +1010,8 @@ void BattleTv_SetDataBasedOnMove(u16 move, u16 weatherFlags, struct DisableStruc
+         tvPtr->side[atkSide ^ BIT_SIDE].explosion = TRUE;
+     }
+ 
+-    AddMovePoints(PTS_REFLECT,      gBattleMoves[move].type, gBattleMoves[move].power, 0);
+-    AddMovePoints(PTS_LIGHT_SCREEN, gBattleMoves[move].type, gBattleMoves[move].power, 0);
++    AddMovePoints(PTS_REFLECT,      move, gBattleMoves[move].power, 0); // arg1 is the move: its category decides Reflect vs Light Screen
++    AddMovePoints(PTS_LIGHT_SCREEN, move, gBattleMoves[move].power, 0);
+     AddMovePoints(PTS_WATER_SPORT,  gBattleMoves[move].type, 0,                        0);
+     AddMovePoints(PTS_MUD_SPORT,    gBattleMoves[move].type, 0,                        0);
+ }
+@@ -1246,7 +1246,7 @@ static void AddMovePoints(u8 caseId, u16 arg1, u8 arg2, u8 arg3)
+         break;
+     case PTS_REFLECT:
+         // If hit Reflect with damaging physical move
+-        if (IS_TYPE_PHYSICAL(type) && power != 0 && tvPtr->side[defSide].reflectMonId != 0)
++        if (IS_MOVE_PHYSICAL(arg1) && power != 0 && tvPtr->side[defSide].reflectMonId != 0)
+         {
+             u32 id = (tvPtr->side[defSide].reflectMonId - 1) * 4;
+             movePoints->points[defSide][id + tvPtr->side[defSide].reflectMoveSlot] += sPointsArray[caseId][0];
+@@ -1254,7 +1254,7 @@ static void AddMovePoints(u8 caseId, u16 arg1, u8 arg2, u8 arg3)
+         break;
+     case PTS_LIGHT_SCREEN:
+         // If hit Light Screen with damaging special move
+-        if (!IS_TYPE_PHYSICAL(type) && power != 0 && tvPtr->side[defSide].lightScreenMonId != 0)
++        if (IS_MOVE_SPECIAL(arg1) && power != 0 && tvPtr->side[defSide].lightScreenMonId != 0)
+         {
+             u32 id = (tvPtr->side[defSide].lightScreenMonId - 1) * 4;
+             movePoints->points[defSide][id + tvPtr->side[defSide].lightScreenMoveSlot] += sPointsArray[caseId][0];
+diff --git a/src/data/battle_moves.h b/src/data/battle_moves.h
+index 82892120fa908a5c6ba2121b341d24b0033f7a7b..88bac4fa8f6223561eb3059ac15886c48e6c8b13 100644
+--- a/src/data/battle_moves.h
++++ b/src/data/battle_moves.h
+@@ -24,6 +24,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_KARATE_CHOP] =
+@@ -37,6 +38,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_DOUBLE_SLAP] =
+@@ -50,6 +52,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_COMET_PUNCH] =
+@@ -63,6 +66,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_MEGA_PUNCH] =
+@@ -76,6 +80,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_PAY_DAY] =
+@@ -89,6 +94,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_FIRE_PUNCH] =
+@@ -102,6 +108,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_ICE_PUNCH] =
+@@ -115,6 +122,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_THUNDER_PUNCH] =
+@@ -128,6 +136,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SCRATCH] =
+@@ -141,6 +150,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_VICE_GRIP] =
+@@ -154,6 +164,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_GUILLOTINE] =
+@@ -167,6 +178,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_RAZOR_WIND] =
+@@ -180,6 +192,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_SWORDS_DANCE] =
+@@ -193,6 +206,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_CUT] =
+@@ -206,6 +220,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_GUST] =
+@@ -219,6 +234,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_WING_ATTACK] =
+@@ -232,6 +248,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_WHIRLWIND] =
+@@ -245,6 +262,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = -6,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_FLY] =
+@@ -258,6 +276,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_BIND] =
+@@ -271,6 +290,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SLAM] =
+@@ -284,6 +304,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_VINE_WHIP] =
+@@ -297,6 +318,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_STOMP] =
+@@ -310,6 +332,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_DOUBLE_KICK] =
+@@ -323,6 +346,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_MEGA_KICK] =
+@@ -336,6 +360,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_JUMP_KICK] =
+@@ -349,6 +374,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_ROLLING_KICK] =
+@@ -362,6 +388,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SAND_ATTACK] =
+@@ -375,6 +402,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_HEADBUTT] =
+@@ -388,6 +416,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_HORN_ATTACK] =
+@@ -401,6 +430,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_FURY_ATTACK] =
+@@ -414,6 +444,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_HORN_DRILL] =
+@@ -427,6 +458,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_TACKLE] =
+@@ -440,6 +472,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_BODY_SLAM] =
+@@ -453,6 +486,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_WRAP] =
+@@ -466,6 +500,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_TAKE_DOWN] =
+@@ -479,6 +514,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_THRASH] =
+@@ -492,6 +528,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_RANDOM,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_DOUBLE_EDGE] =
+@@ -505,6 +542,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_TAIL_WHIP] =
+@@ -518,6 +556,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_POISON_STING] =
+@@ -531,6 +570,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_TWINEEDLE] =
+@@ -544,6 +584,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_PIN_MISSILE] =
+@@ -557,6 +598,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_LEER] =
+@@ -570,6 +612,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_BITE] =
+@@ -583,6 +626,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_GROWL] =
+@@ -596,6 +640,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_ROAR] =
+@@ -609,6 +654,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = -6,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SING] =
+@@ -622,6 +668,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SUPERSONIC] =
+@@ -635,6 +682,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SONIC_BOOM] =
+@@ -648,6 +696,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_DISABLE] =
+@@ -661,6 +710,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_ACID] =
+@@ -674,6 +724,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_EMBER] =
+@@ -687,6 +738,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_FLAMETHROWER] =
+@@ -700,6 +752,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_MIST] =
+@@ -713,6 +766,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_WATER_GUN] =
+@@ -726,6 +780,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_HYDRO_PUMP] =
+@@ -739,6 +794,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_SURF] =
+@@ -752,6 +808,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_ICE_BEAM] =
+@@ -765,6 +822,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_BLIZZARD] =
+@@ -778,6 +836,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_PSYBEAM] =
+@@ -791,6 +850,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_BUBBLE_BEAM] =
+@@ -804,6 +864,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_AURORA_BEAM] =
+@@ -817,6 +878,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_HYPER_BEAM] =
+@@ -830,6 +892,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_PECK] =
+@@ -843,6 +906,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_DRILL_PECK] =
+@@ -856,6 +920,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SUBMISSION] =
+@@ -869,6 +934,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_LOW_KICK] =
+@@ -882,6 +948,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_COUNTER] =
+@@ -895,6 +962,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_DEPENDS,
+         .priority = -5,
+         .flags = FLAG_MAKES_CONTACT | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SEISMIC_TOSS] =
+@@ -908,6 +976,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_STRENGTH] =
+@@ -921,6 +990,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_ABSORB] =
+@@ -934,6 +1004,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_MEGA_DRAIN] =
+@@ -947,6 +1018,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_LEECH_SEED] =
+@@ -960,6 +1032,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_GROWTH] =
+@@ -973,6 +1046,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_RAZOR_LEAF] =
+@@ -986,6 +1060,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SOLAR_BEAM] =
+@@ -999,6 +1074,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_POISON_POWDER] =
+@@ -1012,6 +1088,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_STUN_SPORE] =
+@@ -1025,6 +1102,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SLEEP_POWDER] =
+@@ -1038,6 +1116,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_PETAL_DANCE] =
+@@ -1051,6 +1130,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_RANDOM,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_STRING_SHOT] =
+@@ -1064,6 +1144,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_DRAGON_RAGE] =
+@@ -1077,6 +1158,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_FIRE_SPIN] =
+@@ -1090,6 +1172,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_THUNDER_SHOCK] =
+@@ -1103,6 +1186,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_THUNDERBOLT] =
+@@ -1116,6 +1200,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_THUNDER_WAVE] =
+@@ -1129,6 +1214,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_THUNDER] =
+@@ -1142,6 +1228,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_ROCK_THROW] =
+@@ -1155,6 +1242,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_EARTHQUAKE] =
+@@ -1168,6 +1256,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_FOES_AND_ALLY,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_FISSURE] =
+@@ -1181,6 +1270,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_DIG] =
+@@ -1194,6 +1284,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_TOXIC] =
+@@ -1207,6 +1298,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_CONFUSION] =
+@@ -1220,6 +1312,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_PSYCHIC] =
+@@ -1233,6 +1326,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_HYPNOSIS] =
+@@ -1246,6 +1340,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_MEDITATE] =
+@@ -1259,6 +1354,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_AGILITY] =
+@@ -1272,6 +1368,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_QUICK_ATTACK] =
+@@ -1285,6 +1382,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 1,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_RAGE] =
+@@ -1298,6 +1396,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_TELEPORT] =
+@@ -1311,6 +1410,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_NIGHT_SHADE] =
+@@ -1324,6 +1424,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_MIMIC] =
+@@ -1337,6 +1438,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SCREECH] =
+@@ -1350,6 +1452,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_DOUBLE_TEAM] =
+@@ -1363,6 +1466,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_RECOVER] =
+@@ -1376,6 +1480,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_HARDEN] =
+@@ -1389,6 +1494,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_MINIMIZE] =
+@@ -1402,6 +1508,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SMOKESCREEN] =
+@@ -1415,6 +1522,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_CONFUSE_RAY] =
+@@ -1428,6 +1536,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_WITHDRAW] =
+@@ -1441,6 +1550,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_DEFENSE_CURL] =
+@@ -1454,6 +1564,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_BARRIER] =
+@@ -1467,6 +1578,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_LIGHT_SCREEN] =
+@@ -1480,6 +1592,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_HAZE] =
+@@ -1493,6 +1606,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_REFLECT] =
+@@ -1506,6 +1620,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_FOCUS_ENERGY] =
+@@ -1519,6 +1634,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_BIDE] =
+@@ -1532,6 +1648,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_METRONOME] =
+@@ -1545,6 +1662,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_DEPENDS,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_MIRROR_MOVE] =
+@@ -1558,6 +1676,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_DEPENDS,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SELF_DESTRUCT] =
+@@ -1571,6 +1690,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_FOES_AND_ALLY,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_EGG_BOMB] =
+@@ -1584,6 +1704,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_LICK] =
+@@ -1597,6 +1718,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SMOG] =
+@@ -1610,6 +1732,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_SLUDGE] =
+@@ -1623,6 +1746,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_BONE_CLUB] =
+@@ -1636,6 +1760,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_FIRE_BLAST] =
+@@ -1649,6 +1774,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_WATERFALL] =
+@@ -1662,6 +1788,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_CLAMP] =
+@@ -1675,6 +1802,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SWIFT] =
+@@ -1688,6 +1816,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_SKULL_BASH] =
+@@ -1701,6 +1830,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SPIKE_CANNON] =
+@@ -1714,6 +1844,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_CONSTRICT] =
+@@ -1727,6 +1858,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_AMNESIA] =
+@@ -1740,6 +1872,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_KINESIS] =
+@@ -1753,6 +1886,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SOFT_BOILED] =
+@@ -1766,6 +1900,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_HI_JUMP_KICK] =
+@@ -1779,6 +1914,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_GLARE] =
+@@ -1792,6 +1928,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_DREAM_EATER] =
+@@ -1805,6 +1942,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_POISON_GAS] =
+@@ -1818,6 +1956,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_BARRAGE] =
+@@ -1831,6 +1970,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_LEECH_LIFE] =
+@@ -1844,6 +1984,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_LOVELY_KISS] =
+@@ -1857,6 +1998,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SKY_ATTACK] =
+@@ -1870,6 +2012,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_TRANSFORM] =
+@@ -1883,6 +2026,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_BUBBLE] =
+@@ -1896,6 +2040,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_DIZZY_PUNCH] =
+@@ -1909,6 +2054,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SPORE] =
+@@ -1922,6 +2068,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_FLASH] =
+@@ -1935,6 +2082,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_PSYWAVE] =
+@@ -1948,6 +2096,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_SPLASH] =
+@@ -1961,6 +2110,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_ACID_ARMOR] =
+@@ -1974,6 +2124,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_CRABHAMMER] =
+@@ -1987,6 +2138,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_EXPLOSION] =
+@@ -2000,6 +2152,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_FOES_AND_ALLY,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_FURY_SWIPES] =
+@@ -2013,6 +2166,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_BONEMERANG] =
+@@ -2026,6 +2180,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_REST] =
+@@ -2039,6 +2194,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_ROCK_SLIDE] =
+@@ -2052,6 +2208,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_HYPER_FANG] =
+@@ -2065,6 +2222,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SHARPEN] =
+@@ -2078,6 +2236,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_CONVERSION] =
+@@ -2091,6 +2250,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_TRI_ATTACK] =
+@@ -2104,6 +2264,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_SUPER_FANG] =
+@@ -2117,6 +2278,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SLASH] =
+@@ -2130,6 +2292,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SUBSTITUTE] =
+@@ -2143,6 +2306,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_STRUGGLE] =
+@@ -2156,6 +2320,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SKETCH] =
+@@ -2169,6 +2334,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_TRIPLE_KICK] =
+@@ -2182,6 +2348,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_THIEF] =
+@@ -2195,6 +2362,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SPIDER_WEB] =
+@@ -2208,6 +2376,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_MIND_READER] =
+@@ -2221,6 +2390,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_NIGHTMARE] =
+@@ -2234,6 +2404,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_FLAME_WHEEL] =
+@@ -2247,6 +2418,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SNORE] =
+@@ -2260,6 +2432,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_CURSE] =
+@@ -2273,6 +2446,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_FLAIL] =
+@@ -2286,6 +2460,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_CONVERSION_2] =
+@@ -2299,6 +2474,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_AEROBLAST] =
+@@ -2312,6 +2488,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_COTTON_SPORE] =
+@@ -2325,6 +2502,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_REVERSAL] =
+@@ -2338,6 +2516,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SPITE] =
+@@ -2351,6 +2530,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_POWDER_SNOW] =
+@@ -2364,6 +2544,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_PROTECT] =
+@@ -2377,6 +2558,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 3,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_MACH_PUNCH] =
+@@ -2390,6 +2572,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 1,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SCARY_FACE] =
+@@ -2403,6 +2586,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_FAINT_ATTACK] =
+@@ -2416,6 +2600,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SWEET_KISS] =
+@@ -2429,6 +2614,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_BELLY_DRUM] =
+@@ -2442,6 +2628,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SLUDGE_BOMB] =
+@@ -2455,6 +2642,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_MUD_SLAP] =
+@@ -2468,6 +2656,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_OCTAZOOKA] =
+@@ -2481,6 +2670,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_SPIKES] =
+@@ -2494,6 +2684,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_OPPONENTS_FIELD,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_ZAP_CANNON] =
+@@ -2507,6 +2698,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_FORESIGHT] =
+@@ -2520,6 +2712,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_DESTINY_BOND] =
+@@ -2533,6 +2726,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_PERISH_SONG] =
+@@ -2546,6 +2740,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_ICY_WIND] =
+@@ -2559,6 +2754,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_DETECT] =
+@@ -2572,6 +2768,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 3,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_BONE_RUSH] =
+@@ -2585,6 +2782,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_LOCK_ON] =
+@@ -2598,6 +2796,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_OUTRAGE] =
+@@ -2611,6 +2810,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_RANDOM,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SANDSTORM] =
+@@ -2624,6 +2824,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_GIGA_DRAIN] =
+@@ -2637,6 +2838,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_ENDURE] =
+@@ -2650,6 +2852,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 3,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_CHARM] =
+@@ -2663,6 +2866,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_ROLLOUT] =
+@@ -2676,6 +2880,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_FALSE_SWIPE] =
+@@ -2689,6 +2894,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SWAGGER] =
+@@ -2702,6 +2908,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_MILK_DRINK] =
+@@ -2715,6 +2922,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SPARK] =
+@@ -2728,6 +2936,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_FURY_CUTTER] =
+@@ -2741,6 +2950,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_STEEL_WING] =
+@@ -2754,6 +2964,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_MEAN_LOOK] =
+@@ -2767,6 +2978,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_ATTRACT] =
+@@ -2780,6 +2992,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SLEEP_TALK] =
+@@ -2793,6 +3006,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_DEPENDS,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_HEAL_BELL] =
+@@ -2806,6 +3020,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_RETURN] =
+@@ -2819,6 +3034,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_PRESENT] =
+@@ -2832,6 +3048,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_FRUSTRATION] =
+@@ -2845,6 +3062,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SAFEGUARD] =
+@@ -2858,6 +3076,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_PAIN_SPLIT] =
+@@ -2871,6 +3090,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SACRED_FIRE] =
+@@ -2884,6 +3104,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_MAGNITUDE] =
+@@ -2897,6 +3118,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_FOES_AND_ALLY,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_DYNAMIC_PUNCH] =
+@@ -2910,6 +3132,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_MEGAHORN] =
+@@ -2923,6 +3146,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_DRAGON_BREATH] =
+@@ -2936,6 +3160,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_BATON_PASS] =
+@@ -2949,6 +3174,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_ENCORE] =
+@@ -2962,6 +3188,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_PURSUIT] =
+@@ -2975,6 +3202,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_RAPID_SPIN] =
+@@ -2988,6 +3216,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SWEET_SCENT] =
+@@ -3001,6 +3230,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_IRON_TAIL] =
+@@ -3014,6 +3244,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_METAL_CLAW] =
+@@ -3027,6 +3258,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_VITAL_THROW] =
+@@ -3040,6 +3272,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = -1,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_MORNING_SUN] =
+@@ -3053,6 +3286,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SYNTHESIS] =
+@@ -3066,6 +3300,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_MOONLIGHT] =
+@@ -3079,6 +3314,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_HIDDEN_POWER] =
+@@ -3092,6 +3328,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_CROSS_CHOP] =
+@@ -3105,6 +3342,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_TWISTER] =
+@@ -3118,6 +3356,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_RAIN_DANCE] =
+@@ -3131,6 +3370,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SUNNY_DAY] =
+@@ -3144,6 +3384,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_CRUNCH] =
+@@ -3157,6 +3398,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_MIRROR_COAT] =
+@@ -3170,6 +3412,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_DEPENDS,
+         .priority = -5,
+         .flags = FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_PSYCH_UP] =
+@@ -3183,6 +3426,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_EXTREME_SPEED] =
+@@ -3196,6 +3440,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 1,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_ANCIENT_POWER] =
+@@ -3209,6 +3454,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_SHADOW_BALL] =
+@@ -3222,6 +3468,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_FUTURE_SIGHT] =
+@@ -3235,6 +3482,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_ROCK_SMASH] =
+@@ -3248,6 +3496,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_WHIRLPOOL] =
+@@ -3261,6 +3510,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_BEAT_UP] =
+@@ -3274,6 +3524,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_FAKE_OUT] =
+@@ -3287,6 +3538,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 1,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_UPROAR] =
+@@ -3300,6 +3552,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_RANDOM,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_STOCKPILE] =
+@@ -3313,6 +3566,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SPIT_UP] =
+@@ -3326,6 +3580,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_SWALLOW] =
+@@ -3339,6 +3594,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_HEAT_WAVE] =
+@@ -3352,6 +3608,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_HAIL] =
+@@ -3365,6 +3622,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_TORMENT] =
+@@ -3378,6 +3636,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_FLATTER] =
+@@ -3391,6 +3650,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_WILL_O_WISP] =
+@@ -3404,6 +3664,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_MEMENTO] =
+@@ -3417,6 +3678,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_FACADE] =
+@@ -3430,6 +3692,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_FOCUS_PUNCH] =
+@@ -3443,6 +3706,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = -3,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SMELLING_SALT] =
+@@ -3456,6 +3720,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_FOLLOW_ME] =
+@@ -3469,6 +3734,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 3,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_NATURE_POWER] =
+@@ -3482,6 +3748,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_DEPENDS,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_CHARGE] =
+@@ -3495,6 +3762,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_TAUNT] =
+@@ -3508,6 +3776,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_HELPING_HAND] =
+@@ -3521,6 +3790,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 5,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_TRICK] =
+@@ -3534,6 +3804,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_ROLE_PLAY] =
+@@ -3547,6 +3818,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_WISH] =
+@@ -3560,6 +3832,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_ASSIST] =
+@@ -3573,6 +3846,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_DEPENDS,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_INGRAIN] =
+@@ -3586,6 +3860,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SUPERPOWER] =
+@@ -3599,6 +3874,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_MAGIC_COAT] =
+@@ -3612,6 +3888,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_DEPENDS,
+         .priority = 4,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_RECYCLE] =
+@@ -3625,6 +3902,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_REVENGE] =
+@@ -3638,6 +3916,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = -4,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_BRICK_BREAK] =
+@@ -3651,6 +3930,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_YAWN] =
+@@ -3664,6 +3944,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_KNOCK_OFF] =
+@@ -3677,6 +3958,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_ENDEAVOR] =
+@@ -3690,6 +3972,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_ERUPTION] =
+@@ -3703,6 +3986,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_SKILL_SWAP] =
+@@ -3716,6 +4000,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_IMPRISON] =
+@@ -3729,6 +4014,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_REFRESH] =
+@@ -3742,6 +4028,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_GRUDGE] =
+@@ -3755,6 +4042,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SNATCH] =
+@@ -3768,6 +4056,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_DEPENDS,
+         .priority = 4,
+         .flags = FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_SECRET_POWER] =
+@@ -3781,6 +4070,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_DIVE] =
+@@ -3794,6 +4084,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_ARM_THRUST] =
+@@ -3807,6 +4098,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_CAMOUFLAGE] =
+@@ -3820,6 +4112,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_TAIL_GLOW] =
+@@ -3833,6 +4126,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_LUSTER_PURGE] =
+@@ -3846,6 +4140,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_MIST_BALL] =
+@@ -3859,6 +4154,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_FEATHER_DANCE] =
+@@ -3872,6 +4168,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_TEETER_DANCE] =
+@@ -3885,6 +4182,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_FOES_AND_ALLY,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_BLAZE_KICK] =
+@@ -3898,6 +4196,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_MUD_SPORT] =
+@@ -3911,6 +4210,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_ICE_BALL] =
+@@ -3924,6 +4224,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_NEEDLE_ARM] =
+@@ -3937,6 +4238,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SLACK_OFF] =
+@@ -3950,6 +4252,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_HYPER_VOICE] =
+@@ -3963,6 +4266,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_POISON_FANG] =
+@@ -3976,6 +4280,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_CRUSH_CLAW] =
+@@ -3989,6 +4294,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_BLAST_BURN] =
+@@ -4002,6 +4308,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_HYDRO_CANNON] =
+@@ -4015,6 +4322,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_METEOR_MASH] =
+@@ -4028,6 +4336,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_ASTONISH] =
+@@ -4041,6 +4350,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_WEATHER_BALL] =
+@@ -4054,6 +4364,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_AROMATHERAPY] =
+@@ -4067,6 +4378,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_FAKE_TEARS] =
+@@ -4080,6 +4392,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_AIR_CUTTER] =
+@@ -4093,6 +4406,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_OVERHEAT] =
+@@ -4106,6 +4420,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_ODOR_SLEUTH] =
+@@ -4119,6 +4434,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_ROCK_TOMB] =
+@@ -4132,6 +4448,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SILVER_WIND] =
+@@ -4145,6 +4462,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_METAL_SOUND] =
+@@ -4158,6 +4476,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_GRASS_WHISTLE] =
+@@ -4171,6 +4490,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_TICKLE] =
+@@ -4184,6 +4504,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_COSMIC_POWER] =
+@@ -4197,6 +4518,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_WATER_SPOUT] =
+@@ -4210,6 +4532,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_SIGNAL_BEAM] =
+@@ -4223,6 +4546,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_SHADOW_PUNCH] =
+@@ -4236,6 +4560,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_EXTRASENSORY] =
+@@ -4249,6 +4574,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_SKY_UPPERCUT] =
+@@ -4262,6 +4588,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SAND_TOMB] =
+@@ -4275,6 +4602,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SHEER_COLD] =
+@@ -4288,6 +4616,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_MUDDY_WATER] =
+@@ -4301,6 +4630,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_BOTH,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_BULLET_SEED] =
+@@ -4314,6 +4644,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_AERIAL_ACE] =
+@@ -4327,6 +4658,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_ICICLE_SPEAR] =
+@@ -4340,6 +4672,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_IRON_DEFENSE] =
+@@ -4353,6 +4686,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_BLOCK] =
+@@ -4366,6 +4700,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MAGIC_COAT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_HOWL] =
+@@ -4379,6 +4714,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_DRAGON_CLAW] =
+@@ -4392,6 +4728,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_FRENZY_PLANT] =
+@@ -4405,6 +4742,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_BULK_UP] =
+@@ -4418,6 +4756,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_BOUNCE] =
+@@ -4431,6 +4770,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_MUD_SHOT] =
+@@ -4444,6 +4784,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_POISON_TAIL] =
+@@ -4457,6 +4798,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_COVET] =
+@@ -4470,6 +4812,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_VOLT_TACKLE] =
+@@ -4483,6 +4826,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_MAGICAL_LEAF] =
+@@ -4496,6 +4840,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_WATER_SPORT] =
+@@ -4509,6 +4854,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_CALM_MIND] =
+@@ -4522,6 +4868,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_LEAF_BLADE] =
+@@ -4535,6 +4882,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_MAKES_CONTACT | FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_DRAGON_DANCE] =
+@@ -4548,6 +4896,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_USER,
+         .priority = 0,
+         .flags = FLAG_SNATCH_AFFECTED,
++        .split = SPLIT_STATUS,
+     },
+ 
+     [MOVE_ROCK_BLAST] =
+@@ -4561,6 +4910,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_PHYSICAL,
+     },
+ 
+     [MOVE_SHOCK_WAVE] =
+@@ -4574,6 +4924,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_WATER_PULSE] =
+@@ -4587,6 +4938,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_DOOM_DESIRE] =
+@@ -4600,6 +4952,7 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = 0,
++        .split = SPLIT_SPECIAL,
+     },
+ 
+     [MOVE_PSYCHO_BOOST] =
+@@ -4613,5 +4966,6 @@ const struct BattleMove gBattleMoves[MOVES_COUNT] =
+         .target = MOVE_TARGET_SELECTED,
+         .priority = 0,
+         .flags = FLAG_PROTECT_AFFECTED | FLAG_MIRROR_MOVE_AFFECTED | FLAG_KINGS_ROCK_AFFECTED,
++        .split = SPLIT_SPECIAL,
+     },
+ };
+diff --git a/src/item_menu.c b/src/item_menu.c
+index 86b1bf941dea6e5a41ade0d99d6387dd92aa6974..3bef780ba5ed3e6a5791c28419fe45852cd20c26 100755
+--- a/src/item_menu.c
++++ b/src/item_menu.c
+@@ -124,6 +124,9 @@ static void CB2_Bag(void);
+ static bool8 SetupBagMenu(void);
+ static void BagMenu_InitBGs(void);
+ static bool8 LoadBagMenu_Graphics(void);
++static void LoadTmIconGfx(void);
++static void CreateTmIconSprites(void);
++static void SpriteCB_TmIcon(struct Sprite *sprite);
+ static void LoadBagMenuTextWindows(void);
+ static void AllocateBagItemListBuffers(void);
+ static void LoadBagItemListBuffers(u8);
+@@ -751,6 +754,7 @@ static bool8 SetupBagMenu(void)
+         break;
+     case 15:
+         AddBagVisualSprite(gBagPosition.pocket);
++        CreateTmIconSprites();
+         gMain.state++;
+         break;
+     case 16:
+@@ -835,6 +839,7 @@ static bool8 LoadBagMenu_Graphics(void)
+         break;
+     default:
+         LoadListMenuSwapLineGfx();
++        LoadTmIconGfx();
+         gBagMenu->graphicsLoadState = 0;
+         return TRUE;
+     }
+@@ -940,7 +945,76 @@ static void BagMenu_MoveCursorCallback(s32 itemIndex, bool8 onInit, struct ListM
+         gBagMenu->itemIconSlot ^= 1;
+         if (!gBagMenu->inhibitItemDescriptionPrint)
+             PrintItemDescription(itemIndex);
++        if (gBagPosition.pocket == TMHM_POCKET && itemIndex != LIST_CANCEL)
++            gBagMenu->tmMove = ItemIdToBattleMoveId(BagGetItemIdByPocketPosition(gBagPosition.pocket + 1, itemIndex));
++        else
++            gBagMenu->tmMove = MOVE_NONE;
++    }
++}
++
++// Type and physical/special/status icons for the selected TM/HM, stacked in the
++// empty space left of the bag. They use the summary screen's move type sprites.
++#define TAG_TM_ICON_PAL 30030 // + 0, 1, 2 for the three move type palettes
++#define TM_ICON_X 7
++#define TM_ICON_Y 33
++
++static void LoadTmIconGfx(void)
++{
++    struct SpritePalette pal;
++    u8 i;
++
++    LoadCompressedSpriteSheet(&gSpriteSheet_MoveTypes);
++    LZ77UnCompWram(gMoveTypes_Pal, gDecompressionBuffer);
++    for (i = 0; i < 3; i++)
++    {
++        pal.data = (const u16 *)gDecompressionBuffer + i * 16;
++        pal.tag = TAG_TM_ICON_PAL + i;
++        LoadSpritePalette(&pal);
++    }
++}
++
++static void CreateTmIconSprites(void)
++{
++    struct SpriteTemplate template = {
++        .tileTag = TAG_MOVE_TYPES,
++        .paletteTag = TAG_TM_ICON_PAL,
++        .oam = &gOamData_MoveTypes,
++        .anims = gSpriteAnimTable_MoveTypes,
++        .images = NULL,
++        .affineAnims = gDummySpriteAffineAnimTable,
++        .callback = SpriteCB_TmIcon,
++    };
++    u8 i;
++
++    // tmMove was already set by the list's first cursor callback, so don't reset it here
++    for (i = 0; i < ARRAY_COUNT(gBagMenu->tmIconSpriteIds); i++)
++    {
++        gBagMenu->tmIconSpriteIds[i] = CreateSprite(&template, TM_ICON_X + 16, TM_ICON_Y + 8 + i * 17, 0);
++        gSprites[gBagMenu->tmIconSpriteIds[i]].data[0] = i; // 0 = type, 1 = category
++        gSprites[gBagMenu->tmIconSpriteIds[i]].invisible = TRUE;
++    }
++}
++
++static void SpriteCB_TmIcon(struct Sprite *sprite)
++{
++    u16 move = gBagMenu->tmMove;
++    u8 frame;
++
++    if (move == MOVE_NONE || gBagPosition.pocket != TMHM_POCKET)
++    {
++        sprite->invisible = TRUE;
++        return;
++    }
++    if (sprite->data[0] == 0)
++        frame = gBattleMoves[move].type;
++    else
++        frame = SPLIT_ICON_FRAME(gBattleMoves[move].split);
++    if (sprite->animNum != frame)
++    {
++        StartSpriteAnim(sprite, frame);
++        sprite->oam.paletteNum = IndexOfSpritePaletteTag(TAG_TM_ICON_PAL + gMoveTypeToOamPaletteNum[frame] - 13);
+     }
++    sprite->invisible = FALSE;
+ }
+ 
+ static void BagMenu_ItemPrintCallback(u8 windowId, u32 itemIndex, u8 y)
+@@ -1318,6 +1392,7 @@ static void SwitchBagPocket(u8 taskId, s16 deltaBagPocketId, bool16 skipEraseLis
+     tPocketSwitchState = 0;
+     tPocketSwitchTimer = 0;
+     tPocketSwitchDir = deltaBagPocketId;
++    gBagMenu->tmMove = MOVE_NONE; // hide the TM icons while the pockets slide
+     if (!skipEraseList)
+     {
+         ClearWindowTilemap(WIN_ITEM_LIST);
+diff --git a/src/menu_specialized.c b/src/menu_specialized.c
+index bd00d25acfe087f0cc1eb6a46d3c455c9cac4209..3f96ca4237cc9790a25af52e45d369144dfffd72 100644
+--- a/src/menu_specialized.c
++++ b/src/menu_specialized.c
+@@ -749,6 +749,16 @@ u8 LoadMoveRelearnerMovesList(const struct ListMenuItem *items, u16 numChoices)
+     return gMultiuseListMenuTemplate.maxShowed;
+ }
+ 
++static const u8 sText_SplitPhysical[] = _("PHYSICAL");
++static const u8 sText_SplitSpecial[] = _("SPECIAL");
++static const u8 sText_SplitStatus[] = _("STATUS");
++static const u8 *const sMoveSplitNames[] =
++{
++    [SPLIT_PHYSICAL] = sText_SplitPhysical,
++    [SPLIT_SPECIAL] = sText_SplitSpecial,
++    [SPLIT_STATUS] = sText_SplitStatus,
++};
++
+ static void MoveRelearnerLoadBattleMoveDescription(u32 chosenMove)
+ {
+     s32 x;
+@@ -762,15 +772,15 @@ static void MoveRelearnerLoadBattleMoveDescription(u32 chosenMove)
+     AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, str, x, 1, TEXT_SKIP_DRAW, NULL);
+ 
+     str = gText_MoveRelearnerPP;
+-    AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, str, 4, 41, TEXT_SKIP_DRAW, NULL);
++    AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, str, 4, 33, TEXT_SKIP_DRAW, NULL);
+ 
+     str = gText_MoveRelearnerPower;
+     x = GetStringRightAlignXOffset(FONT_NORMAL, str, 106);
+-    AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, str, x, 25, TEXT_SKIP_DRAW, NULL);
++    AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, str, x, 17, TEXT_SKIP_DRAW, NULL);
+ 
+     str = gText_MoveRelearnerAccuracy;
+     x = GetStringRightAlignXOffset(FONT_NORMAL, str, 106);
+-    AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, str, x, 41, TEXT_SKIP_DRAW, NULL);
++    AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, str, x, 33, TEXT_SKIP_DRAW, NULL);
+     if (chosenMove == LIST_CANCEL)
+     {
+         // On "Cancel", skip printing move data
+@@ -779,11 +789,15 @@ static void MoveRelearnerLoadBattleMoveDescription(u32 chosenMove)
+     }
+     move = &gBattleMoves[chosenMove];
+     str = gTypeNames[move->type];
+-    AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, str, 4, 25, TEXT_SKIP_DRAW, NULL);
++    AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, str, 4, 17, TEXT_SKIP_DRAW, NULL);
++
++    // Physical/special/status on a third row under the type and PP
++    str = sMoveSplitNames[move->split];
++    AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, str, 4, 49, TEXT_SKIP_DRAW, NULL);
+ 
+     x = 4 + GetStringWidth(FONT_NORMAL, gText_MoveRelearnerPP, 0);
+     ConvertIntToDecimalStringN(buffer, move->pp, STR_CONV_MODE_LEFT_ALIGN, 2);
+-    AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, buffer, x, 41, TEXT_SKIP_DRAW, NULL);
++    AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, buffer, x, 33, TEXT_SKIP_DRAW, NULL);
+ 
+     if (move->power < 2)
+     {
+@@ -794,7 +808,7 @@ static void MoveRelearnerLoadBattleMoveDescription(u32 chosenMove)
+         ConvertIntToDecimalStringN(buffer, move->power, STR_CONV_MODE_LEFT_ALIGN, 3);
+         str = buffer;
+     }
+-    AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, str, 106, 25, TEXT_SKIP_DRAW, NULL);
++    AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, str, 106, 17, TEXT_SKIP_DRAW, NULL);
+ 
+     if (move->accuracy == 0)
+     {
+@@ -805,7 +819,7 @@ static void MoveRelearnerLoadBattleMoveDescription(u32 chosenMove)
+         ConvertIntToDecimalStringN(buffer, move->accuracy, STR_CONV_MODE_LEFT_ALIGN, 3);
+         str = buffer;
+     }
+-    AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, str, 106, 41, TEXT_SKIP_DRAW, NULL);
++    AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NORMAL, str, 106, 33, TEXT_SKIP_DRAW, NULL);
+ 
+     str = gMoveDescriptionPointers[chosenMove - 1];
+     AddTextPrinterParameterized(RELEARNERWIN_DESC_BATTLE, FONT_NARROW, str, 0, 65, 0, NULL);
+diff --git a/src/pokemon.c b/src/pokemon.c
+index 4b5c197140eb7b21f4fb3377d4cbe3d1a4c01eb0..bbf835d935e37c17890259f6749c693688ad1e79 100644
+--- a/src/pokemon.c
++++ b/src/pokemon.c
+@@ -3173,7 +3173,7 @@ s32 CalculateBaseDamage(struct BattlePokemon *attacker, struct BattlePokemon *de
+         if (attackerHoldEffect == sHoldEffectToType[i][0]
+             && type == sHoldEffectToType[i][1])
+         {
+-            if (IS_TYPE_PHYSICAL(type))
++            if (IS_MOVE_PHYSICAL(move))
+                 attack = (attack * (attackerHoldEffectParam + 100)) / 100;
+             else
+                 spAttack = (spAttack * (attackerHoldEffectParam + 100)) / 100;
+@@ -3229,7 +3229,7 @@ s32 CalculateBaseDamage(struct BattlePokemon *attacker, struct BattlePokemon *de
+     if (gBattleMoves[gCurrentMove].effect == EFFECT_EXPLOSION)
+         defense /= 2;
+ 
+-    if (IS_TYPE_PHYSICAL(type))
++    if (IS_MOVE_PHYSICAL(move))
+     {
+         if (gCritMultiplier == 2)
+         {
+@@ -3284,7 +3284,7 @@ s32 CalculateBaseDamage(struct BattlePokemon *attacker, struct BattlePokemon *de
+     if (type == TYPE_MYSTERY)
+         damage = 0; // is ??? type. does 0 damage.
+ 
+-    if (IS_TYPE_SPECIAL(type))
++    if (IS_MOVE_SPECIAL(move))
+     {
+         if (gCritMultiplier == 2)
+         {
+diff --git a/src/pokemon_summary_screen.c b/src/pokemon_summary_screen.c
+index 96407787b2dcd50d2943f3b63d7b20379db97b97..95acba490b6ff22b131cd921c6af43ae33f2ce7b 100644
+--- a/src/pokemon_summary_screen.c
++++ b/src/pokemon_summary_screen.c
+@@ -108,6 +108,9 @@ enum {
+ 
+ #define MOVE_SELECTOR_SPRITES_COUNT 10
+ #define TYPE_ICON_SPRITE_COUNT (MAX_MON_MOVES + 1)
++// Top-left corner of the physical/special/status icon
++#define SPLIT_ICON_X 200
++#define SPLIT_ICON_Y 109
+ // for the spriteIds field in PokemonSummaryScreenData
+ enum
+ {
+@@ -117,9 +120,11 @@ enum
+     SPRITE_ARR_ID_TYPE, // 2 for mon types, 5 for move types(4 moves and 1 to learn), used interchangeably, because mon types and move types aren't shown on the same screen
+     SPRITE_ARR_ID_MOVE_SELECTOR1 = SPRITE_ARR_ID_TYPE + TYPE_ICON_SPRITE_COUNT, // 10 sprites that make up the selector
+     SPRITE_ARR_ID_MOVE_SELECTOR2 = SPRITE_ARR_ID_MOVE_SELECTOR1 + MOVE_SELECTOR_SPRITES_COUNT,
+-    SPRITE_ARR_ID_COUNT = SPRITE_ARR_ID_MOVE_SELECTOR2 + MOVE_SELECTOR_SPRITES_COUNT
++    SPRITE_ARR_ID_SPLIT = SPRITE_ARR_ID_MOVE_SELECTOR2 + MOVE_SELECTOR_SPRITES_COUNT, // physical/special/status icon
++    SPRITE_ARR_ID_COUNT
+ };
+ 
++
+ #define TILE_EMPTY_APPEAL_HEART  0x1039
+ #define TILE_FILLED_APPEAL_HEART 0x103A
+ #define TILE_FILLED_JAM_HEART    0x103C
+@@ -186,6 +191,7 @@ static EWRAM_DATA struct PokemonSummaryScreenData
+     bool8 handleDeoxys;
+     s16 switchCounter; // Used for various switch statement cases that decompress/load graphics or Pokémon data
+     u8 unk_filler4[6];
++    u16 splitIconMove; // move whose physical/special/status icon is shown, MOVE_NONE = hidden
+ } *sMonSummaryScreen = NULL;
+ EWRAM_DATA u8 gLastViewedMonIndex = 0;
+ static EWRAM_DATA u8 sMoveSlotToReplace = 0;
+@@ -751,10 +757,9 @@ static const u8 sMovesPPLayout[] = _("{PP}{DYNAMIC 0}/{DYNAMIC 1}");
+ 
+ #define TAG_MOVE_SELECTOR 30000
+ #define TAG_MON_STATUS 30001
+-#define TAG_MOVE_TYPES 30002
+ #define TAG_MON_MARKINGS 30003
+ 
+-static const struct OamData sOamData_MoveTypes =
++const struct OamData gOamData_MoveTypes =
+ {
+     .y = 0,
+     .affineMode = ST_OAM_AFFINE_OFF,
+@@ -862,7 +867,19 @@ static const union AnimCmd sSpriteAnim_CategoryTough[] = {
+     ANIMCMD_FRAME((CONTEST_CATEGORY_TOUGH + NUMBER_OF_MON_TYPES) * 8, 0, FALSE, FALSE),
+     ANIMCMD_END
+ };
+-static const union AnimCmd *const sSpriteAnimTable_MoveTypes[NUMBER_OF_MON_TYPES + CONTEST_CATEGORIES_COUNT] = {
++static const union AnimCmd sSpriteAnim_SplitPhysical[] = {
++    ANIMCMD_FRAME(SPLIT_ICON_FRAME(SPLIT_PHYSICAL) * 8, 0, FALSE, FALSE),
++    ANIMCMD_END
++};
++static const union AnimCmd sSpriteAnim_SplitSpecial[] = {
++    ANIMCMD_FRAME(SPLIT_ICON_FRAME(SPLIT_SPECIAL) * 8, 0, FALSE, FALSE),
++    ANIMCMD_END
++};
++static const union AnimCmd sSpriteAnim_SplitStatus[] = {
++    ANIMCMD_FRAME(SPLIT_ICON_FRAME(SPLIT_STATUS) * 8, 0, FALSE, FALSE),
++    ANIMCMD_END
++};
++const union AnimCmd *const gSpriteAnimTable_MoveTypes[MOVE_TYPE_SPRITE_FRAMES] = {
+     sSpriteAnim_TypeNormal,
+     sSpriteAnim_TypeFighting,
+     sSpriteAnim_TypeFlying,
+@@ -886,25 +903,39 @@ static const union AnimCmd *const sSpriteAnimTable_MoveTypes[NUMBER_OF_MON_TYPES
+     sSpriteAnim_CategoryCute,
+     sSpriteAnim_CategorySmart,
+     sSpriteAnim_CategoryTough,
++    [SPLIT_ICON_FRAME(SPLIT_PHYSICAL)] = sSpriteAnim_SplitPhysical,
++    [SPLIT_ICON_FRAME(SPLIT_SPECIAL)] = sSpriteAnim_SplitSpecial,
++    [SPLIT_ICON_FRAME(SPLIT_STATUS)] = sSpriteAnim_SplitStatus,
+ };
+ 
+-static const struct CompressedSpriteSheet sSpriteSheet_MoveTypes =
++const struct CompressedSpriteSheet gSpriteSheet_MoveTypes =
+ {
+     .data = gMoveTypes_Gfx,
+-    .size = (NUMBER_OF_MON_TYPES + CONTEST_CATEGORIES_COUNT) * 0x100,
++    .size = MOVE_TYPE_SPRITE_FRAMES * 0x100,
+     .tag = TAG_MOVE_TYPES
+ };
+ static const struct SpriteTemplate sSpriteTemplate_MoveTypes =
+ {
+     .tileTag = TAG_MOVE_TYPES,
+     .paletteTag = TAG_MOVE_TYPES,
+-    .oam = &sOamData_MoveTypes,
+-    .anims = sSpriteAnimTable_MoveTypes,
++    .oam = &gOamData_MoveTypes,
++    .anims = gSpriteAnimTable_MoveTypes,
+     .images = NULL,
+     .affineAnims = gDummySpriteAffineAnimTable,
+     .callback = SpriteCallbackDummy
+ };
+-static const u8 sMoveTypeToOamPaletteNum[NUMBER_OF_MON_TYPES + CONTEST_CATEGORIES_COUNT] =
++static void SpriteCB_SplitIcon(struct Sprite *sprite);
++static const struct SpriteTemplate sSpriteTemplate_SplitIcon =
++{
++    .tileTag = TAG_MOVE_TYPES,
++    .paletteTag = TAG_MOVE_TYPES,
++    .oam = &gOamData_MoveTypes,
++    .anims = gSpriteAnimTable_MoveTypes,
++    .images = NULL,
++    .affineAnims = gDummySpriteAffineAnimTable,
++    .callback = SpriteCB_SplitIcon
++};
++const u8 gMoveTypeToOamPaletteNum[MOVE_TYPE_SPRITE_FRAMES] =
+ {
+     [TYPE_NORMAL] = 13,
+     [TYPE_FIGHTING] = 13,
+@@ -929,6 +960,9 @@ static const u8 sMoveTypeToOamPaletteNum[NUMBER_OF_MON_TYPES + CONTEST_CATEGORIE
+     [NUMBER_OF_MON_TYPES + CONTEST_CATEGORY_CUTE] = 14,
+     [NUMBER_OF_MON_TYPES + CONTEST_CATEGORY_SMART] = 15,
+     [NUMBER_OF_MON_TYPES + CONTEST_CATEGORY_TOUGH] = 13,
++    [SPLIT_ICON_FRAME(SPLIT_PHYSICAL)] = 13,
++    [SPLIT_ICON_FRAME(SPLIT_SPECIAL)] = 14,
++    [SPLIT_ICON_FRAME(SPLIT_STATUS)] = 13,
+ };
+ static const struct OamData sOamData_MoveSelector =
+ {
+@@ -1356,7 +1390,7 @@ static bool8 DecompressGraphics(void)
+         sMonSummaryScreen->switchCounter++;
+         break;
+     case 7:
+-        LoadCompressedSpriteSheet(&sSpriteSheet_MoveTypes);
++        LoadCompressedSpriteSheet(&gSpriteSheet_MoveTypes);
+         sMonSummaryScreen->switchCounter++;
+         break;
+     case 8:
+@@ -3662,6 +3696,11 @@ static void PrintMoveDetails(u16 move)
+ {
+     u8 windowId = AddWindowFromTemplateList(sPageMovesTemplate, PSS_DATA_WINDOW_MOVE_DESCRIPTION);
+     FillWindowPixelBuffer(windowId, PIXEL_FILL(0));
++    // Show the physical/special/status icon whenever battle move details are shown
++    if (sMonSummaryScreen->currPageIndex == PSS_PAGE_BATTLE_MOVES)
++        sMonSummaryScreen->splitIconMove = move;
++    else
++        sMonSummaryScreen->splitIconMove = MOVE_NONE;
+     if (move != MOVE_NONE)
+     {
+         if (sMonSummaryScreen->currPageIndex == PSS_PAGE_BATTLE_MOVES)
+@@ -3802,13 +3841,37 @@ static void CreateMoveTypeIcons(void)
+ 
+         SetSpriteInvisibility(i, TRUE);
+     }
++
++    if (sMonSummaryScreen->spriteIds[SPRITE_ARR_ID_SPLIT] == SPRITE_NONE)
++        sMonSummaryScreen->spriteIds[SPRITE_ARR_ID_SPLIT] = CreateSprite(&sSpriteTemplate_SplitIcon, 0, 0, 2);
++    SetSpriteInvisibility(SPRITE_ARR_ID_SPLIT, TRUE);
++}
++
++// Physical/special/status icon, on the right end of the DESCRIPTION header
++static void SpriteCB_SplitIcon(struct Sprite *sprite)
++{
++    u16 move = sMonSummaryScreen->splitIconMove;
++
++    if (move == MOVE_NONE || sMonSummaryScreen->currPageIndex != PSS_PAGE_BATTLE_MOVES)
++    {
++        sprite->invisible = TRUE;
++        return;
++    }
++    if (sprite->animNum != SPLIT_ICON_FRAME(gBattleMoves[move].split))
++    {
++        StartSpriteAnim(sprite, SPLIT_ICON_FRAME(gBattleMoves[move].split));
++        sprite->oam.paletteNum = gMoveTypeToOamPaletteNum[SPLIT_ICON_FRAME(gBattleMoves[move].split)];
++    }
++    sprite->x = SPLIT_ICON_X + 16;
++    sprite->y = SPLIT_ICON_Y + 8;
++    sprite->invisible = FALSE;
+ }
+ 
+ static void SetTypeSpritePosAndPal(u8 typeId, u8 x, u8 y, u8 spriteArrayId)
+ {
+     struct Sprite *sprite = &gSprites[sMonSummaryScreen->spriteIds[spriteArrayId]];
+     StartSpriteAnim(sprite, typeId);
+-    sprite->oam.paletteNum = sMoveTypeToOamPaletteNum[typeId];
++    sprite->oam.paletteNum = gMoveTypeToOamPaletteNum[typeId];
+     sprite->x = x + 16;
+     sprite->y = y + 8;
+     SetSpriteInvisibility(spriteArrayId, FALSE);

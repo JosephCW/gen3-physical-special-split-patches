@@ -1,0 +1,8 @@
+# working copies made by setup.sh
+/work/
+# never commit ROMs or saves
+*.gba
+*.sav
+*.srm
+__pycache__/
+.DS_Store
