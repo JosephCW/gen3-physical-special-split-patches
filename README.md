@@ -6,6 +6,10 @@ Diamond/Pearl/Platinum category. The games also show each move's category in-gam
 summary screen, when learning a move, at the Move Relearner/Tutor, and in the TM Case or
 Bag. The trainer AI is updated to reason about the categories too.
 
+> **Pokémon Colosseum / XD: Gale of Darkness:** these GameCube games aren't covered here.
+> [GoD Tool](https://github.com/PekanMmd/Pokemon-XD-Code) (and its Colosseum Tool) has a
+> patch that applies the Gen 4 physical/special split to both.
+
 | FireRed / LeafGreen | Ruby / Sapphire | Emerald |
 |---|---|---|
 | ![](FireRed-LeafGreen/screenshots/summary_shadow_ball_special.png) | ![](Ruby-Sapphire/screenshots/summary_shadow_ball_special.png) | ![](Emerald/screenshots/summary_shadow_ball_special.png) |
@@ -128,11 +132,15 @@ less likely). FireRed shown; the other games differ by at most 0.15:
 | | Light Screen | −1.61 | +0.00 |
 | vs a Gyarados-like Pokémon (Water/Flying, Attack > Sp. Atk) | Light Screen | +0.00 | −1.55 |
 | | Growl | −1.52 | +0.00 |
-| after you used Shadow Ball | Counter | +0.59 | −1.00 |
-| after you used Crunch | Mirror Coat | +0.61 | −1.00 |
+| after you used Shadow Ball (now special) | Counter | +0.59 | −1.00 |
+| after you used Crunch (now physical) | Mirror Coat | +0.61 | −1.00 |
+| after you used Crunch (now physical) | Counter | −1.00 | +0.63 |
+| after you used Shadow Ball (now special) | Mirror Coat | −1.00 | +0.64 |
 
 So the AI now puts up Light Screen, not Reflect, against Gengar. It stops using Counter
-on a special Shadow Ball (which Counter can't reflect) and Mirror Coat on a physical Crunch.
+on a special Shadow Ball (which Counter can't reflect) and Mirror Coat on a physical Crunch,
+and does the opposite where the old AI was wrong the other way: it now favours Counter
+after a physical Crunch and Mirror Coat after a special Shadow Ball.
 
 ### Known limitations
 

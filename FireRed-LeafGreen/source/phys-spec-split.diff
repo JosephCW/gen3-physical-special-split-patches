@@ -440,7 +440,7 @@ index 414dc41767295aed38f299e8495c5e2f8d25ddc9..66dd196a60f02cb2b78d9189f3a753df
  #define SPINDA_SPOT_WIDTH 16
 diff --git a/patch_tools/ai_test/ai_read.py b/patch_tools/ai_test/ai_read.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..84abc1c0e10ab751a7ce5427abe3627d89516c46
+index 0000000000000000000000000000000000000000..5415f30556d8786deae1b6e51b2e9e25de008829
 --- /dev/null
 +++ b/patch_tools/ai_test/ai_read.py
 @@ -0,0 +1,48 @@
@@ -452,7 +452,7 @@ index 0000000000000000000000000000000000000000..84abc1c0e10ab751a7ce5427abe3627d
 +"""
 +import socket, sys, time
 +
-+SCENARIOS, MOVES = 4, 4   # matches sAiTestScenarios in test_ai.inc
++SCENARIOS, MOVES = 6, 4   # matches sAiTestScenarios in test_ai.inc
 +bp, addr = int(sys.argv[1], 16), int(sys.argv[2], 16)
 +
 +for _ in range(60):                       # wait for mGBA to open its GDB port
@@ -494,10 +494,10 @@ index 0000000000000000000000000000000000000000..84abc1c0e10ab751a7ce5427abe3627d
 +    print(*[int.from_bytes(row[i:i + 4], 'little', signed=True) for i in range(0, MOVES * 4, 4)])
 diff --git a/patch_tools/ai_test/ai_report.py b/patch_tools/ai_test/ai_report.py
 new file mode 100644
-index 0000000000000000000000000000000000000000..58fe9495b0a8eef95cca80669c5bcd3488cf3250
+index 0000000000000000000000000000000000000000..44d7f9a5eca48debb06310e006e85701c131f591
 --- /dev/null
 +++ b/patch_tools/ai_test/ai_report.py
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,31 @@
 +#!/usr/bin/env python3
 +"""Print the before/after table from two ai_read.py outputs.
 +
@@ -511,8 +511,10 @@ index 0000000000000000000000000000000000000000..58fe9495b0a8eef95cca80669c5bcd34
 +SCENARIOS = [
 +    ('vs Gengar-like (Ghost/Poison, Sp. Atk > Attack)', ['Reflect', 'Light Screen', 'Growl', 'Tackle'], 3),
 +    ('vs Gyarados-like (Water/Flying, Attack > Sp. Atk)', ['Reflect', 'Light Screen', 'Growl', 'Tackle'], 3),
-+    ('after the target used Shadow Ball', ['Counter', 'Tackle', 'Growl', 'Tail Whip'], 1),
-+    ('after the target used Crunch', ['Mirror Coat', 'Tackle', 'Growl', 'Tail Whip'], 1),
++    ('after the target used Shadow Ball (now special)', ['Counter', 'Tackle', 'Growl', 'Tail Whip'], 1),
++    ('after the target used Crunch (now physical)', ['Mirror Coat', 'Tackle', 'Growl', 'Tail Whip'], 1),
++    ('after the target used Crunch (now physical)', ['Counter', 'Tackle', 'Growl', 'Tail Whip'], 1),
++    ('after the target used Shadow Ball (now special)', ['Mirror Coat', 'Tackle', 'Growl', 'Tail Whip'], 1),
 +]
 +
 +def load(path):
@@ -583,10 +585,10 @@ index 0000000000000000000000000000000000000000..9cee4ef19a199c752efd8cfa1e19fe0c
 +python3 -I "$HERE/ai_report.py" "$WORK/before.txt" "$WORK/after.txt"
 diff --git a/patch_tools/ai_test/test_ai.inc b/patch_tools/ai_test/test_ai.inc
 new file mode 100644
-index 0000000000000000000000000000000000000000..af25dacbdd041ea93f71f944ae984f0ae77b03dd
+index 0000000000000000000000000000000000000000..41aa1c89bf4fc27e1fdfd0905c41b4f4e93a47c6
 --- /dev/null
 +++ b/patch_tools/ai_test/test_ai.inc
-@@ -0,0 +1,106 @@
+@@ -0,0 +1,109 @@
 +// Trainer AI category test. run_ai_test.sh includes this file at the end of
 +// src/main.c's includes and calls TestAi() once at boot, before the main loop.
 +//
@@ -624,6 +626,9 @@ index 0000000000000000000000000000000000000000..af25dacbdd041ea93f71f944ae984f0a
 +    {TYPE_GHOST, TYPE_POISON,  85, 150, MOVE_SHADOW_BALL, {MOVE_COUNTER, MOVE_TACKLE, MOVE_GROWL, MOVE_TAIL_WHIP}},
 +    // The target just used Crunch (Dark: old special, now physical)
 +    {TYPE_ROCK,  TYPE_DARK,   154, 115, MOVE_CRUNCH,      {MOVE_MIRROR_COAT, MOVE_TACKLE, MOVE_GROWL, MOVE_TAIL_WHIP}},
++    // The reverse pairs: moves the counter-move does work against now
++    {TYPE_ROCK,  TYPE_DARK,   154, 115, MOVE_CRUNCH,      {MOVE_COUNTER, MOVE_TACKLE, MOVE_GROWL, MOVE_TAIL_WHIP}},
++    {TYPE_GHOST, TYPE_POISON,  85, 150, MOVE_SHADOW_BALL, {MOVE_MIRROR_COAT, MOVE_TACKLE, MOVE_GROWL, MOVE_TAIL_WHIP}},
 +};
 +
 +s32 gTestAiScore[ARRAY_COUNT(sAiTestScenarios)][MAX_MON_MOVES];
