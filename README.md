@@ -119,13 +119,14 @@ own type's moves running off their weaker attacking stat:
 
 It goes both ways. Some Pokémon lose out, exactly as they did in Gen 4:
 
-* **Shedinja** (90 / 30): Shadow Ball, its Ghost STAB, now uses its 30 Sp. Atk instead of
-  its 90 Attack.
-* **Jynx** (50 / 115): Ice Punch now uses its 50 Attack instead of its 115 Sp. Atk.
-* **Dodrio** (110 / 60): Tri Attack, its Normal STAB, now uses its 60 Sp. Atk instead of
-  its 110 Attack.
-* **Hyper Beam** is now special, so physical attackers that relied on it as a finisher
-  (Tauros, Kangaskhan, Snorlax, Machamp, Heracross, …) hit far weaker with it.
+| Pokémon (base Attack / Sp. Atk) | Move | Original games | With this patch |
+|---|---|---|---|
+| **Shedinja** (90 / 30) | Shadow Ball | Physical: its Ghost STAB used its 90 Attack | Special: uses its 30 Sp. Atk |
+| **Jynx** (50 / 115) | Ice Punch | Special: its Ice STAB used its 115 Sp. Atk | Physical: uses its 50 Attack |
+| **Dodrio** (110 / 60) | Tri Attack | Physical: its Normal STAB used its 110 Attack | Special: uses its 60 Sp. Atk |
+| **Snorlax** (110 / 65), **Slaking** (160 / 95), **Ursaring** (130 / 75) | Hyper Beam | Physical: their Normal STAB finisher used their Attack | Special: uses their Sp. Atk, about 0.6× their Attack |
+| **Muk** (105 / 65) | Sludge Bomb, Sludge | Physical: its Poison STAB used its 105 Attack | Special: uses its 65 Sp. Atk |
+| **Latios** (90 / 130) | Dragon Claw | Special: its Dragon STAB used its 130 Sp. Atk | Physical: uses its 90 Attack |
 
 ### Trainer AI
 
