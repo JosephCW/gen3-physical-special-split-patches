@@ -7,7 +7,7 @@ summary screen, when learning a move, at the Move Relearner/Tutor, and in the TM
 Bag. The trainer AI is updated to reason about the categories too.
 
 > **Pokémon Colosseum / XD: Gale of Darkness:** these GameCube games aren't covered here.
-> [GoD Tool](https://github.com/PekanMmd/Pokemon-XD-Code) (and its Colosseum Tool) has a
+> [GoD Tool](https://projectpokemon.org/home/files/file/2463-gale-of-darkness-tool-osx-colosseum-tool/) (and its Colosseum Tool) has a
 > patch that applies the Gen 4 physical/special split to both.
 
 | FireRed / LeafGreen | Ruby / Sapphire | Emerald |
