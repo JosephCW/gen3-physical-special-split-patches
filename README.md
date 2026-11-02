@@ -109,12 +109,23 @@ own type's moves running off their weaker attacking stat:
 
 | Pokémon (base Attack / Sp. Atk) | Move | Original games | With this patch |
 |---|---|---|---|
-| **Gengar** (65 / 130) | Shadow Ball, Sludge Bomb | Physical: its own STAB moves used its weak Attack, so Gengar was usually given Psychic or Thunderbolt instead | Special: uses its 130 Sp. Atk |
+| **Kingler** (130 / 50), **Crawdaunt** (120 / 90) | Crabhammer | Special: their signature move used their weaker Sp. Atk (Kingler's is just 50) | Physical: uses their 130 / 120 Attack |
 | **Sneasel** (95 / 35) | Faint Attack | Special: its Dark STAB used one of the lowest Sp. Atk stats in the game | Physical: uses its 95 Attack |
 | **Gyarados** (125 / 60) | Waterfall | Special: its Water STAB used its weak Sp. Atk, so it usually ran Normal and Ground moves instead | Physical: uses its 125 Attack |
-| **Kingler** (130 / 50) | Crabhammer | Special: its signature move used its 50 Sp. Atk | Physical: uses its 130 Attack |
-| **Crawdaunt** (120 / 90) | Crabhammer | Special | Physical: uses its 120 Attack |
-| **Salamence** (135 / 110) | Dragon Claw | Special | Physical: uses its 135 Attack |
+| **Gengar** (65 / 130) | Shadow Ball, Sludge Bomb | Physical: its own STAB moves used its weak Attack, so Gengar was usually given Psychic or Thunderbolt instead | Special: uses its 130 Sp. Atk |
+| **Omastar** (60 / 115) | Ancient Power | Physical: its Rock STAB used its 60 Attack | Special: uses its 115 Sp. Atk |
+| **Absol** (130 / 75) | Bite | Special: its Dark STAB used its weaker Sp. Atk | Physical: uses its 130 Attack |
+| **Hitmonchan** (105 / 35) | Fire / Ice / Thunder Punch | Special: its signature punches used its 35 Sp. Atk | Physical: uses its 105 Attack |
+
+It goes both ways. Some Pokémon lose out, exactly as they did in Gen 4:
+
+* **Shedinja** (90 / 30): Shadow Ball, its Ghost STAB, now uses its 30 Sp. Atk instead of
+  its 90 Attack.
+* **Jynx** (50 / 115): Ice Punch now uses its 50 Attack instead of its 115 Sp. Atk.
+* **Dodrio** (110 / 60): Tri Attack, its Normal STAB, now uses its 60 Sp. Atk instead of
+  its 110 Attack.
+* **Hyper Beam** is now special, so physical attackers that relied on it as a finisher
+  (Tauros, Kangaskhan, Snorlax, Machamp, Heracross, …) hit far weaker with it.
 
 ### Trainer AI
 
