@@ -6,3 +6,4 @@
 *.srm
 __pycache__/
 .DS_Store
+/tools/visual_test/out/

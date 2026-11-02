@@ -1,0 +1,187 @@
+diff --git a/src/main.c b/src/main.c
+index 33b560c..9d3bd4f 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -217,9 +217,138 @@ void InitKeys(void)
+     gMain.newKeysRaw = 0;
+ }
+ 
++// ---- split test harness ----
++#include "pokemon.h"
++#include "battle.h"
++#include "pokemon_summary_screen.h"
++#include "string_util.h"
++#include "constants/moves.h"
++#include "constants/species.h"
++#include "constants/region_map_sections.h"
++extern void CB2_InitMoveTutorMenu(void);
++extern u16 gSpecialVar_0x8004;
++u32 gTestDumpId;
++static u32 sTestFrame;
++static bool8 sTestStarted;
++void TestDumpPoint(u32 id)
++{
++    gTestDumpId = id;
++}
++// Ruby writes scroll registers directly (they can't be read back), so build a
++// readable copy of the display registers for the capture script.
++u16 gTestRegs[0x30];
++static void TestCaptureRegs(u32 id)
++{
++    u32 i;
++    for (i = 0; i < 0x30; i++)
++        gTestRegs[i] = ((vu16 *)REG_ADDR_DISPCNT)[i];
++    for (i = 8; i < 16; i++)
++        gTestRegs[i] = 0;
++    if (id <= 6 || id == 10) // summary screen scrolls its backgrounds through these variables
++    {
++        gTestRegs[8] = gBattle_BG0_X;  gTestRegs[9] = gBattle_BG0_Y;
++        gTestRegs[10] = gBattle_BG1_X; gTestRegs[11] = gBattle_BG1_Y;
++        gTestRegs[12] = gBattle_BG2_X; gTestRegs[13] = gBattle_BG2_Y;
++        gTestRegs[14] = gBattle_BG3_X; gTestRegs[15] = gBattle_BG3_Y;
++    }
++}
++static void CB2_TestRelearner(void)
++{
++    gSpecialVar_0x8004 = 0;
++    SetMainCallback2(CB2_InitMoveTutorMenu);
++}
++static void CB2_TestSelectMove(void)
++{
++    ShowSelectMovePokemonSummaryScreen(gPlayerParty, 0, 0, CB2_TestRelearner, MOVE_EARTHQUAKE);
++}
++s32 gTestDmg[4];
++extern u8 gCritMultiplier;
++extern u16 gBattleTypeFlags;
++extern u16 gCurrentMove;
++s32 CalculateBaseDamage(struct BattlePokemon *attacker, struct BattlePokemon *defender, u32 move, u16 sideStatus, u16 powerOverride, u8 typeOverride, u8 battlerIdAtk, u8 battlerIdDef);
++// Attack 200 / Sp. Atk 50 vs Defense 100 / Sp. Def 100, all level 50
++static void TestDamage(void)
++{
++    static const u16 moves[4] = {MOVE_BITE, MOVE_SHADOW_BALL, MOVE_FIRE_PUNCH, MOVE_FLAMETHROWER};
++    struct BattlePokemon atk, def;
++    u32 i;
++    memset(&atk, 0, sizeof(atk));
++    memset(&def, 0, sizeof(def));
++    atk.level = def.level = 50;
++    atk.attack = 200; atk.spAttack = 50;
++    def.defense = 100; def.spDefense = 100;
++    atk.maxHP = atk.hp = def.maxHP = def.hp = 200;
++    for (i = 0; i < 8; i++)
++        atk.statStages[i] = def.statStages[i] = 6;
++    gBattleTypeFlags = 0;
++    gCritMultiplier = 1;
++    for (i = 0; i < 4; i++)
++    {
++        gCurrentMove = moves[i];
++        gTestDmg[i] = CalculateBaseDamage(&atk, &def, moves[i], 0, 0, 0, 0, 1);
++    }
++}
++void TestSplitSetup(void)
++{
++    static const u8 sName[] = _("RED");
++    u8 metLoc = MAPSEC_LITTLEROOT_TOWN;
++    TestDamage();
++    StringCopy(gSaveBlock2.playerName, sName);
++    ZeroPlayerPartyMons();
++    CreateMon(&gPlayerParty[0], SPECIES_CHARIZARD, 60, 31, FALSE, 0, 0, 0);
++    SetMonMoveSlot(&gPlayerParty[0], MOVE_FLAMETHROWER, 0);
++    SetMonMoveSlot(&gPlayerParty[0], MOVE_SLASH, 1);
++    SetMonMoveSlot(&gPlayerParty[0], MOVE_SCARY_FACE, 2);
++    SetMonMoveSlot(&gPlayerParty[0], MOVE_SHADOW_BALL, 3);
++    SetMonData(&gPlayerParty[0], MON_DATA_MET_LOCATION, &metLoc);
++    CalculatePlayerPartyCount();
++    sTestFrame = 0;
++    sTestStarted = TRUE;
++    gMain.state = 0;
++    ShowPokemonSummaryScreen(gPlayerParty, 0, 0, CB2_TestSelectMove, PSS_MODE_NORMAL);
++}
++static const u16 sTestScript[][2] = {
++    // {frame, key}; key >= 1000 means "dump point (key - 1000)"
++    {150, DPAD_RIGHT}, {210, DPAD_RIGHT}, {270, A_BUTTON},
++    {340, 1001}, {350, DPAD_DOWN}, {400, 1002}, {410, DPAD_DOWN}, {460, 1003},
++    {470, DPAD_DOWN}, {520, 1004}, {525, DPAD_RIGHT}, {565, 1010}, {575, B_BUTTON}, {620, B_BUTTON},
++    {760, 1005}, {770, DPAD_DOWN}, {800, DPAD_DOWN}, {830, DPAD_DOWN}, {860, DPAD_DOWN}, {920, 1006},
++    {930, B_BUTTON}, {1150, 1007}, {1160, DPAD_DOWN}, {1220, 1008}, {1230, DPAD_DOWN}, {1290, 1009},
++    {1300, DPAD_RIGHT}, {1360, 1011}, {1370, DPAD_LEFT}, {1430, 1012},
++};
++static u16 TestInjectKeys(void)
++{
++    u32 i;
++    u16 keys = 0;
++    sTestFrame++;
++    if (!sTestStarted)
++    {
++        // Mash through intro, title screen and main menu until NEW GAME is chosen
++        if (sTestFrame % 60 < 2)
++            return (sTestFrame % 120 < 60) ? A_BUTTON : START_BUTTON;
++        return 0;
++    }
++    for (i = 0; i < ARRAY_COUNT(sTestScript); i++)
++    {
++        if (sTestScript[i][1] >= 1000)
++        {
++            if (sTestFrame == sTestScript[i][0])
++            {
++                TestCaptureRegs(sTestScript[i][1] - 1000);
++                TestDumpPoint(sTestScript[i][1] - 1000);
++            }
++        }
++        else if (sTestFrame >= sTestScript[i][0] && sTestFrame < sTestScript[i][0] + 3)
++        {
++            keys |= sTestScript[i][1];
++        }
++    }
++    return keys;
++}
++
+ static void ReadKeys(void)
+ {
+-    u16 keyInput = REG_KEYINPUT ^ KEYS_MASK;
++    u16 keyInput = (REG_KEYINPUT ^ KEYS_MASK) | TestInjectKeys();
+     gMain.newKeysRaw = keyInput & ~gMain.heldKeysRaw;
+     gMain.newKeys = gMain.newKeysRaw;
+     gMain.newAndRepeatedKeys = gMain.newKeysRaw;
+diff --git a/src/main_menu.c b/src/main_menu.c
+index 9769686..6b79021 100644
+--- a/src/main_menu.c
++++ b/src/main_menu.c
+@@ -568,9 +568,13 @@ void Task_MainMenuPressedA(u8 taskId)
+     {
+     case NEW_GAME:
+     default:
+-        gPlttBufferUnfaded[0] = 0;
+-        gPlttBufferFaded[0] = 0;
+-        gTasks[taskId].func = Task_NewGameSpeech1;
++        {
++            extern void TestSplitSetup(void);
++            if (taskId == 0xFF) // never true; keeps the skipped intro task referenced
++                gTasks[taskId].func = Task_NewGameSpeech1;
++            DestroyTask(taskId);
++            TestSplitSetup();
++        }
+         break;
+     case CONTINUE:
+         gPlttBufferUnfaded[0] = 0;
+diff --git a/src/move_tutor_menu.c b/src/move_tutor_menu.c
+index 48f365a..630cd62 100644
+--- a/src/move_tutor_menu.c
++++ b/src/move_tutor_menu.c
+@@ -37,7 +37,7 @@ extern const u8 deuOtherText_ForgotAndLearned[];
+ #endif
+ 
+ static void InitMoveTutorMenuWaitFade(u8);
+-static void CB2_InitMoveTutorMenu(void);
++void CB2_InitMoveTutorMenu(void);
+ static void CB2_MoveTutorMenu(void);
+ static void MoveTutorMain(void);
+ static void DrawLearnMoveMenuWindow(void);
+@@ -254,7 +254,7 @@ static void InitMoveTutorMenuWaitFade(u8 taskId)
+     }
+ }
+ 
+-static void CB2_InitMoveTutorMenu(void)
++void CB2_InitMoveTutorMenu(void)
+ {
+     REG_DISPCNT = 0;
+     ResetSpriteData();

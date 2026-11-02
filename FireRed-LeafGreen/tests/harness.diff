@@ -1,0 +1,154 @@
+diff --git a/src/learn_move.c b/src/learn_move.c
+index cbb55a1..7b319c6 100644
+--- a/src/learn_move.c
++++ b/src/learn_move.c
+@@ -153,7 +153,7 @@ struct LearnMoveGfxResources
+ static EWRAM_DATA struct LearnMoveGfxResources * sMoveRelearner = NULL;
+ 
+ static void Task_InitMoveRelearnerMenu(u8 taskId);
+-static void CB2_MoveRelearner_Init(void);
++void CB2_MoveRelearner_Init(void);
+ static void CB2_MoveRelearner(void);
+ static void MoveRelearnerStateMachine(void);
+ static void DrawTextBorderOnWindows6and7(void);
+@@ -421,7 +421,7 @@ static void MoveRelearnerLoadBgGfx(void)
+     }
+ }
+ 
+-static void CB2_MoveRelearner_Init(void)
++void CB2_MoveRelearner_Init(void)
+ {
+     SetGpuReg(REG_OFFSET_DISPCNT, 0);
+     ResetSpriteData();
+diff --git a/src/main.c b/src/main.c
+index 542b0f5..96a385f 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -293,9 +293,113 @@ void InitKeys(void)
+     gMain.newKeysRaw = 0;
+ }
+ 
++// ---- split test harness ----
++#include "new_game.h"
++#include "battle.h"
++#include "string_util.h"
++#include "pokemon_summary_screen.h"
++#include "constants/moves.h"
++#include "constants/species.h"
++#include "event_data.h"
++#include "constants/region_map_sections.h"
++extern void CB2_MoveRelearner_Init(void);
++u32 gTestDumpId;
++static u32 sTestFrame;
++static bool8 sTestStarted;
++void TestDumpPoint(u32 id)
++{
++    gTestDumpId = id;
++}
++static void CB2_TestRelearner(void)
++{
++    gSpecialVar_0x8004 = 0;
++    SetMainCallback2(CB2_MoveRelearner_Init);
++}
++static void CB2_TestSelectMove(void)
++{
++    ShowSelectMovePokemonSummaryScreen(gPlayerParty, 0, 0, CB2_TestRelearner, MOVE_EARTHQUAKE);
++}
++s32 gTestDmg[4];
++static void TestDamage(void)
++{
++    static const u16 moves[4] = {MOVE_BITE, MOVE_SHADOW_BALL, MOVE_FIRE_PUNCH, MOVE_FLAMETHROWER};
++    struct BattlePokemon atk, def;
++    u32 i;
++    memset(&atk, 0, sizeof(atk));
++    memset(&def, 0, sizeof(def));
++    atk.level = def.level = 50;
++    atk.attack = 200; atk.spAttack = 50;
++    def.defense = 100; def.spDefense = 100;
++    atk.maxHP = atk.hp = def.maxHP = def.hp = 200;
++    for (i = 0; i < 8; i++)
++        atk.statStages[i] = def.statStages[i] = DEFAULT_STAT_STAGE;
++    gBattleTypeFlags = 0;
++    gCritMultiplier = 1;
++    for (i = 0; i < 4; i++)
++    {
++        gCurrentMove = moves[i];
++        gTestDmg[i] = CalculateBaseDamage(&atk, &def, moves[i], 0, 0, 0, 0, 1);
++    }
++}
++void TestSplitSetup(void)
++{
++    static const u8 sName[] = _("RED");
++    TestDamage();
++    ZeroPlayerPartyMons();
++    StringCopy(gSaveBlock2Ptr->playerName, sName);
++    CreateMon(&gPlayerParty[0], SPECIES_CHARIZARD, 60, 31, FALSE, 0, OT_ID_PLAYER_ID, 0);
++    SetMonMoveSlot(&gPlayerParty[0], MOVE_FLAMETHROWER, 0);
++    SetMonMoveSlot(&gPlayerParty[0], MOVE_SLASH, 1);
++    SetMonMoveSlot(&gPlayerParty[0], MOVE_SCARY_FACE, 2);
++    SetMonMoveSlot(&gPlayerParty[0], MOVE_SHADOW_BALL, 3);
++    {
++        u8 metLoc = MAPSEC_PALLET_TOWN;
++        SetMonData(&gPlayerParty[0], MON_DATA_MET_LOCATION, &metLoc);
++    }
++    CalculatePlayerPartyCount();
++    sTestFrame = 0;
++    sTestStarted = TRUE;
++    gMain.state = 0;
++    ShowPokemonSummaryScreen(gPlayerParty, 0, 0, CB2_TestSelectMove, PSS_MODE_NORMAL);
++}
++static const u16 sTestScript[][2] = {
++    // frame, key (0 = dump point, id in key field + 1000)
++    {150, DPAD_RIGHT}, {210, DPAD_RIGHT}, {270, A_BUTTON},
++    {340, 1001}, {350, DPAD_DOWN}, {400, 1002}, {410, DPAD_DOWN}, {460, 1003},
++    {470, DPAD_DOWN}, {520, 1004}, {530, B_BUTTON}, {580, B_BUTTON},
++    {760, 1005}, {770, DPAD_DOWN}, {800, DPAD_DOWN}, {830, DPAD_DOWN}, {860, DPAD_DOWN}, {920, 1006},
++    {930, B_BUTTON}, {1150, 1007}, {1160, DPAD_DOWN}, {1220, 1008}, {1230, DPAD_DOWN}, {1290, 1009},
++};
++static u16 TestInjectKeys(void)
++{
++    u32 i;
++    u16 keys = 0;
++    sTestFrame++;
++    if (!sTestStarted)
++    {
++        // Mash through intro, title screen and main menu until NEW GAME is chosen
++        if (sTestFrame % 60 < 2)
++            return (sTestFrame % 120 < 60) ? A_BUTTON : START_BUTTON;
++        return 0;
++    }
++    for (i = 0; i < ARRAY_COUNT(sTestScript); i++)
++    {
++        if (sTestScript[i][1] >= 1000)
++        {
++            if (sTestFrame == sTestScript[i][0])
++                TestDumpPoint(sTestScript[i][1] - 1000);
++        }
++        else if (sTestFrame >= sTestScript[i][0] && sTestFrame < sTestScript[i][0] + 3)
++        {
++            keys |= sTestScript[i][1];
++        }
++    }
++    return keys;
++}
++
+ static void ReadKeys(void)
+ {
+-    u16 keyInput = REG_KEYINPUT ^ KEYS_MASK;
++    u16 keyInput = (REG_KEYINPUT ^ KEYS_MASK) | TestInjectKeys();
+     gMain.newKeysRaw = keyInput & ~gMain.heldKeysRaw;
+     gMain.newKeys = gMain.newKeysRaw;
+     gMain.newAndRepeatedKeys = gMain.newKeysRaw;
+diff --git a/src/main_menu.c b/src/main_menu.c
+index 5cef7c4..ab6882a 100644
+--- a/src/main_menu.c
++++ b/src/main_menu.c
+@@ -471,7 +471,7 @@ static void Task_ExecuteMainMenuSelection(u8 taskId)
+             gExitStairsMovementDisabled = FALSE;
+             FreeAllWindowBuffers();
+             DestroyTask(taskId);
+-            StartNewGameScene();
++            { extern void TestSplitSetup(void); TestSplitSetup(); }
+             break;
+         case MAIN_MENU_CONTINUE:
+             gPlttBufferUnfaded[0] = RGB_BLACK;

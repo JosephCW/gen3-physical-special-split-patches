@@ -70,7 +70,7 @@ load. Or from a terminal: `mGBA -p Emerald_PhysSpecSplit.bps "Pokemon Emerald.gb
 
 **Command line (Python 3, no dependencies):**
 ```sh
-python3 bps.py apply "Pokemon Emerald.gba" Emerald/Emerald_PhysSpecSplit.bps "Emerald Split.gba"
+python3 tools/bps.py apply "Pokemon Emerald.gba" Emerald/Emerald_PhysSpecSplit.bps "Emerald Split.gba"
 ```
 
 Then play the patched `.gba` in any GBA emulator or on a flash cart.
@@ -107,6 +107,9 @@ Poison, Ground, Rock, Bug, Ghost and Steel moves were physical; Fire, Water, Gra
 Electric, Psychic, Ice, Dragon and Dark moves were special. Many Pokémon ended up with their
 own type's moves running off their weaker attacking stat:
 
+<details>
+<summary>Show Pokémon that gain</summary>
+
 | Pokémon (base Attack / Sp. Atk) | Move | Original games | With this patch |
 |---|---|---|---|
 | **Kingler** (130 / 50), **Crawdaunt** (120 / 90) | Crabhammer | Special: their signature move used their weaker Sp. Atk (Kingler's is just 50) | Physical: uses their 130 / 120 Attack |
@@ -117,7 +120,12 @@ own type's moves running off their weaker attacking stat:
 | **Absol** (130 / 75) | Bite | Special: its Dark STAB used its weaker Sp. Atk | Physical: uses its 130 Attack |
 | **Hitmonchan** (105 / 35) | Fire / Ice / Thunder Punch | Special: its signature punches used its 35 Sp. Atk | Physical: uses its 105 Attack |
 
+</details>
+
 It goes both ways. Some Pokémon lose out, exactly as they did in Gen 4:
+
+<details>
+<summary>Show Pokémon that lose out</summary>
 
 | Pokémon (base Attack / Sp. Atk) | Move | Original games | With this patch |
 |---|---|---|---|
@@ -127,6 +135,8 @@ It goes both ways. Some Pokémon lose out, exactly as they did in Gen 4:
 | **Snorlax** (110 / 65), **Slaking** (160 / 95), **Ursaring** (130 / 75) | Hyper Beam | Physical: their Normal STAB finisher used their Attack | Special: uses their Sp. Atk, about 0.6× their Attack |
 | **Muk** (105 / 65) | Sludge Bomb, Sludge | Physical: its Poison STAB used its 105 Attack | Special: uses its 65 Sp. Atk |
 | **Latios** (90 / 130) | Dragon Claw | Special: its Dragon STAB used its 130 Sp. Atk | Physical: uses its 90 Attack |
+
+</details>
 
 ### Trainer AI
 
@@ -141,7 +151,7 @@ The patch changes these guesses to:
   both). Used for Reflect, Light Screen, Attack / Sp. Atk drops (Growl, etc.), and Counter /
   Mirror Coat before you've attacked.
 
-Measured with the [AI test](#ai-test) (average change to the move's score over 256 runs;
+Measured with the [AI test](docs/DEVELOPING.md#ai-test) (average change to the move's score over 256 runs;
 the AI usually picks its highest-scoring move, so a drop of 1–2 points makes a move much
 less likely). FireRed shown; the other games differ by at most 0.15:
 
@@ -170,153 +180,11 @@ after a physical Crunch and Mirror Coat after a special Shadow Ball.
 
 ## Building from source
 
-The patches are built from [pret](https://github.com/pret)'s decompilations, which compile
-to byte-identical ROMs. Each game folder stores its changes as
-`source/phys-spec-split.diff` against a pinned upstream commit, listed in
-[`games.txt`](games.txt) along with the pinned agbcc compiler. Each game's README lists the
-files changed, common edits, and its `make` targets.
-
-| Games | Decomp | Setup name |
-|---|---|---|
-| FireRed / LeafGreen | [pret/pokefirered](https://github.com/pret/pokefirered) | `firered-leafgreen` |
-| Ruby / Sapphire | [pret/pokeruby](https://github.com/pret/pokeruby) | `ruby-sapphire` |
-| Emerald | [pret/pokeemerald](https://github.com/pret/pokeemerald) | `emerald` |
-
-### Prerequisites
-
-On macOS:
-```sh
-brew install arm-none-eabi-gcc arm-none-eabi-binutils libpng pkgconf
-```
-For Linux or Windows/WSL, install the packages listed in the decomp's `INSTALL.md`.
-
-### With the helper scripts
-
-```sh
-./setup.sh emerald                  # clone, apply the diff, build agbcc -> work/pokeemerald
-cd work/pokeemerald                 # edit the source here, then:
-patch_tools/make_patches.sh "/path/to/clean Emerald.gba"   # pass one or more clean ROMs
-../../export.sh emerald             # save the diff and the new .bps back into Emerald/
-```
-
-`make_patches.sh` identifies each clean ROM by its SHA-1, builds the matching game in a
-fresh copy of the source (so leftover build files can't end up in a patch), writes the
-`.bps`, and checks that the patch recreates the built ROM exactly. `export.sh` rewrites
-`source/phys-spec-split.diff` and copies the patches into the game folder. Commit both.
-`work/` is ignored by git.
-
-### Without the scripts
-
-The same steps by hand, using Emerald as the example (substitute the game's decomp,
-commit from `games.txt`, and `make` target from its README):
-
-```sh
-# 1. pret's agbcc compiler
-git clone https://github.com/pret/agbcc
-cd agbcc && git checkout da598c1d918402c42c0c0d7128ba14567f3175e9 && ./build.sh && cd ..
-
-# 2. the decomp at the pinned commit, with this repository's changes applied
-git clone https://github.com/pret/pokeemerald
-cd pokeemerald
-git checkout 731ad5bfd6e6f265508d0efcca0ba42f9dcf5881
-git apply --binary /path/to/gen3/Emerald/source/phys-spec-split.diff
-(cd ../agbcc && ./install.sh ../pokeemerald)
-
-# 3. build the modified ROM
-make -j8                            # Emerald; e.g. `make firered_rev1` or `make ruby_rev2` for others
-
-# 4. make the patch from your clean ROM and the built ROM, with any BPS tool
-python3 /path/to/gen3/bps.py create "clean Emerald.gba" pokeemerald.gba Emerald_PhysSpecSplit.bps
-#   or: flips --create --bps "clean Emerald.gba" pokeemerald.gba Emerald_PhysSpecSplit.bps
-```
-
-To save source edits back into this repository by hand, write the diff from the decomp's
-directory. `git add -N` makes new files show up in the diff; `harness.diff` needs `-f`
-because pret's `.gitignore` ignores `*.diff`. Delete any `__pycache__` folders first.
-```sh
-git add -N . && git add -N -f patch_tools/visual_test/harness.diff
-git diff --binary --full-index HEAD -- . ':!patches' > /path/to/gen3/Emerald/source/phys-spec-split.diff
-```
-
-### Checking the original game still builds
-
-After changing the pinned commit, build the untouched upstream code in a separate checkout
-and compare it with the official ROM (use the game's `compare` target from its README):
-```sh
-cd work/pokeemerald
-git worktree add --detach /tmp/vanilla-check HEAD
-cp -R tools/agbcc /tmp/vanilla-check/tools/
-make -C /tmp/vanilla-check -j8 compare
-git worktree remove --force /tmp/vanilla-check
-```
-
-## How the screenshots were made
-
-The screenshots aren't emulator screen captures. They're rendered from the game's own video
-memory by a self-driving test build, so they show the GBA's own graphics at native
-resolution. Each working copy from `setup.sh` has the test at
-`patch_tools/visual_test/run_visual_test.sh`:
-
-1. It copies the working copy to a temporary folder and applies `harness.diff`. This adds
-   code that skips the intro, builds a test party (a Charizard with Flamethrower, Slash,
-   Scary Face and Shadow Ball), and presses buttons on a fixed schedule to open the changed
-   screens.
-2. It builds that copy and runs it in [mGBA](https://mgba.io) with mGBA's GDB stub turned on.
-3. `gdb_dump.py`, a small GDB Remote Serial Protocol client (plain Python, no gdb needed),
-   connects to mGBA on port 2345, stops the game at each screen, and dumps VRAM, palette
-   RAM, sprite (OAM) memory and the display registers.
-4. `render_gba.py` redraws the four tiled background layers and the sprites from each dump
-   into a PNG. It's a simple software renderer: it skips colour blending, windows and
-   sprite scaling, which these menus barely use.
-
-It also runs a damage check (Bite, Shadow Ball, Fire Punch and Flamethrower from an
-Attack-200 / Sp. Atk-50 attacker), which confirms damage follows each move's category.
-
-| Game | Command (from the working copy) | Screens |
-|---|---|---|
-| FireRed / LeafGreen | `patch_tools/visual_test/run_visual_test.sh [leafgreen\|firered]` | summary, forget-a-move, Move Relearner |
-| Ruby / Sapphire | `patch_tools/visual_test/run_visual_test.sh [ruby\|sapphire]` | summary, forget-a-move, Move Tutor |
-| Emerald | `patch_tools/visual_test/run_visual_test.sh` | summary, forget-a-move, Move Relearner |
-
-The PNGs go to `patch_tools/visual_test/out/`; copy the ones you want into the game's
-`screenshots/` folder. The TM Case and Bag screenshots came from a variant of the harness
-whose button schedule opens the TM Case or the Bag's TMs & HMs pocket instead. The test
-needs the mGBA app (`brew install --cask mgba-app`) plus the build prerequisites above
-(`arm-none-eabi-nm` finds the addresses to stop at); an mGBA window opens for a minute or
-two. Your working
-copy isn't changed.
-
-The category badges were drawn to match each game's art: FireRed/LeafGreen's are added to
-the menu icon sheet `graphics/interface/menu_info.png`, and Ruby/Sapphire/Emerald's are made
-from the Fight, Water and Steel type icons, using the same palettes.
-
-## AI test
-
-Each working copy has `patch_tools/ai_test/run_ai_test.sh`, which produced the
-[Trainer AI](#trainer-ai) table. It builds the game twice, from the untouched upstream
-code ("before") and from your working copy ("after"), each with `test_ai.inc` added.
-That file runs at boot: it sets up a battle state for each scenario (the target's types,
-Attack / Sp. Atk and last move, and the AI's four moves), runs the AI's move-scoring
-script 256 times with a fixed random seed, and sums the scores. `ai_read.py` reads the
-sums from each build in mGBA over the GDB stub, and `ai_report.py` prints the table. Like
-the visual test, it needs the mGBA app and doesn't change your working copy.
-
-| Game | Command (from the working copy) |
-|---|---|
-| FireRed / LeafGreen | `patch_tools/ai_test/run_ai_test.sh [firered\|leafgreen\|…]` |
-| Ruby / Sapphire | `patch_tools/ai_test/run_ai_test.sh [ruby_rev2\|sapphire_rev2\|…]` |
-| Emerald | `patch_tools/ai_test/run_ai_test.sh` |
-
-## Repository layout
-
-| Path | What it is |
-|---|---|
-| `<Game>/*.bps` | the patches |
-| `<Game>/README.md` | supported ROMs, screenshots, files changed and build targets for that game |
-| `<Game>/source/phys-spec-split.diff` | every source change, including the build and test tools under `patch_tools/` |
-| `games.txt` | pinned upstream commits of the decomps and agbcc |
-| `setup.sh`, `export.sh` | create a working copy with the changes / save changes back |
-| `bps.py` | command-line BPS patcher (create and apply) |
+The patches are built from [pret](https://github.com/pret)'s decompilations of the games.
+Each game folder holds its source changes as `source/phys-spec-split.diff`, and `tools/`
+has scripts to set up a working copy, rebuild the patches and run the tests. See
+[docs/DEVELOPING.md](docs/DEVELOPING.md) for how to change a patch, build it with or
+without the scripts, and how the screenshots and AI numbers were produced.
 
 ## Credits and license
 

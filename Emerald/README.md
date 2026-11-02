@@ -54,8 +54,8 @@ attacking move's category too (`src/battle_tv.c`).
 
 Built from [pret/pokeemerald](https://github.com/pret/pokeemerald) at commit
 `731ad5bfd6e6f265508d0efcca0ba42f9dcf5881`. Every change is in
-[`source/phys-spec-split.diff`](source/phys-spec-split.diff), including the build and test
-tools under `patch_tools/`.
+[`source/phys-spec-split.diff`](source/phys-spec-split.diff). Test-only code is kept separately
+in [`tests/`](tests/) and never goes into a patch.
 
 | File | Change |
 |---|---|
@@ -91,7 +91,8 @@ tools under `patch_tools/`.
 
 ## Build targets
 
-`./setup.sh emerald` creates a working copy in `work/pokeemerald`.
+`tools/setup.sh emerald` creates a working copy in `work/pokeemerald`; [`game.conf`](game.conf) holds these
+targets for the scripts. See [docs/DEVELOPING.md](../docs/DEVELOPING.md) for the rest.
 
 | Patch | `make` target | Built ROM | Vanilla `compare` target |
 |---|---|---|---|

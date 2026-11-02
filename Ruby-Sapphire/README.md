@@ -60,8 +60,8 @@ the two games look the same apart from the bag colour.)
 
 Built from [pret/pokeruby](https://github.com/pret/pokeruby) at commit
 `5784633ce4ef7ade1a7f2d2d0c288e3d5e6cdd7f`. Every change is in
-[`source/phys-spec-split.diff`](source/phys-spec-split.diff), including the build and test
-tools under `patch_tools/`.
+[`source/phys-spec-split.diff`](source/phys-spec-split.diff). Test-only code is kept separately
+in [`tests/`](tests/) and never goes into a patch.
 
 | File | Change |
 |---|---|
@@ -96,7 +96,8 @@ tools under `patch_tools/`.
 
 ## Build targets
 
-`./setup.sh ruby-sapphire` creates a working copy in `work/pokeruby`.
+`tools/setup.sh ruby-sapphire` creates a working copy in `work/pokeruby`; [`game.conf`](game.conf) holds these
+targets for the scripts. See [docs/DEVELOPING.md](../docs/DEVELOPING.md) for the rest.
 
 | Patch | `make` target | Built ROM | Vanilla `compare` target |
 |---|---|---|---|

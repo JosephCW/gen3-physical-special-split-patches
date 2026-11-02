@@ -55,8 +55,8 @@ move to forget.
 
 Built from [pret/pokefirered](https://github.com/pret/pokefirered) at commit
 `ce6406d8c2eaf46d543c8a2606de0c3cb1951982`. Every change is in
-[`source/phys-spec-split.diff`](source/phys-spec-split.diff), including the build and test
-tools under `patch_tools/`.
+[`source/phys-spec-split.diff`](source/phys-spec-split.diff). Test-only code is kept separately
+in [`tests/`](tests/) and never goes into a patch.
 
 | File | Change |
 |---|---|
@@ -89,7 +89,8 @@ tools under `patch_tools/`.
 
 ## Build targets
 
-`./setup.sh firered-leafgreen` creates a working copy in `work/pokefirered`.
+`tools/setup.sh firered-leafgreen` creates a working copy in `work/pokefirered`; [`game.conf`](game.conf) holds these
+targets for the scripts. See [docs/DEVELOPING.md](../docs/DEVELOPING.md) for the rest.
 
 | Patch | `make` target | Built ROM | Vanilla `compare` target |
 |---|---|---|---|
