@@ -10,6 +10,271 @@ index 0f887cab3be8fc9db0002d81409fb47610f35b54..b7c7e8160d491835a8eec6997e2672e3
 +# phys/spec split patch tooling
 +*.gba.verify
 +patch_tools/visual_test/out/
+diff --git a/data/battle_ai_scripts.s b/data/battle_ai_scripts.s
+index 9a2714a0e4de0c15d9dcbf8d11d9cb110b15b9f5..6e876b9e463d96912b320725a12ed16c1623bc17 100644
+--- a/data/battle_ai_scripts.s
++++ b/data/battle_ai_scripts.s
+@@ -923,8 +923,8 @@ AI_CV_DefenseUp4: @ 81DACDC
+ 	get_move_power_from_result
+ 	if_equal 0, AI_CV_DefenseUp5
+ 	get_move TARGET
+-	get_move_type_from_result
+-	if_not_in_bytes AI_CV_DefenseUp_PhysicalTypes, AI_CV_DefenseUp_ScoreDown2
++	get_move_split_from_result
++	if_not_equal SPLIT_PHYSICAL, AI_CV_DefenseUp_ScoreDown2
+ 	if_random_less_than 60, AI_CV_DefenseUp_End
+ 
+ AI_CV_DefenseUp5: @ 81DACFE
+@@ -936,18 +936,6 @@ AI_CV_DefenseUp_ScoreDown2: @ 81DAD04
+ AI_CV_DefenseUp_End: @ 81DAD06
+ 	end
+ 
+-AI_CV_DefenseUp_PhysicalTypes: @ 81DAD07
+-	.byte TYPE_NORMAL
+-	.byte TYPE_FIGHTING
+-	.byte TYPE_POISON
+-	.byte TYPE_GROUND
+-	.byte TYPE_FLYING
+-	.byte TYPE_ROCK
+-	.byte TYPE_BUG
+-	.byte TYPE_GHOST
+-	.byte TYPE_STEEL
+-	.byte -1
+-
+ AI_CV_SpeedUp: @ 81DAD11
+ 	if_would_go_first USER, AI_CV_SpeedUp2
+ 	score -3
+@@ -1003,8 +991,8 @@ AI_CV_SpDefUp4: @ 81DAD93
+ 	get_move_power_from_result
+ 	if_equal 0, AI_CV_SpDefUp5
+ 	get_move TARGET
+-	get_move_type_from_result
+-	if_in_bytes AI_CV_SpDefUp_PhysicalTypes, AI_CV_SpDefUp_ScoreDown2
++	get_move_split_from_result
++	if_equal SPLIT_PHYSICAL, AI_CV_SpDefUp_ScoreDown2
+ 	if_random_less_than 60, AI_CV_SpDefUp_End
+ 
+ AI_CV_SpDefUp5: @ 81DADB5
+@@ -1016,18 +1004,6 @@ AI_CV_SpDefUp_ScoreDown2: @ 81DADBB
+ AI_CV_SpDefUp_End: @ 81DADBD
+ 	end
+ 
+-AI_CV_SpDefUp_PhysicalTypes: @ 81DADBE
+-	.byte TYPE_NORMAL
+-	.byte TYPE_FIGHTING
+-	.byte TYPE_POISON
+-	.byte TYPE_GROUND
+-	.byte TYPE_FLYING
+-	.byte TYPE_ROCK
+-	.byte TYPE_BUG
+-	.byte TYPE_GHOST
+-	.byte TYPE_STEEL
+-	.byte -1
+-
+ AI_CV_AccuracyUp: @ 81DADC8
+ 	if_stat_level_less_than USER, ACCURACY, 9, AI_CV_AccuracyUp2
+ 	if_random_less_than 50, AI_CV_AccuracyUp2
+@@ -1120,26 +1096,13 @@ AI_CV_AttackDown3: @ 81DAECF
+ 	score -2
+ 
+ AI_CV_AttackDown4: @ 81DAED8
+-	get_type ENEMY_TYPE1
+-	if_in_bytes AI_CV_AttackDown_UnknownTypeList, AI_CV_AttackDown_End
+-	get_type PLAYER_TYPE1
+-	if_in_bytes AI_CV_AttackDown_UnknownTypeList, AI_CV_AttackDown_End
++	if_target_physical_attacker AI_CV_AttackDown_End
+ 	if_random_less_than 50, AI_CV_AttackDown_End
+ 	score -2
+ 
+ AI_CV_AttackDown_End: @ 81DAEF6
+ 	end
+ 
+-AI_CV_AttackDown_UnknownTypeList: @ 81DAEF7
+-@ why these types specifically?
+-	.byte TYPE_NORMAL
+-	.byte TYPE_FIGHTING
+-	.byte TYPE_GROUND
+-	.byte TYPE_ROCK
+-	.byte TYPE_BUG
+-	.byte TYPE_STEEL
+-	.byte -1
+-
+ AI_CV_DefenseDown: @ 81DAEFE
+ 	if_hp_less_than USER, 70, AI_CV_DefenseDown2
+ 	if_stat_level_more_than TARGET, DEFENSE, 3, AI_CV_DefenseDown3
+@@ -1189,27 +1152,13 @@ AI_CV_SpAtkDown3: @ 81DAF6E
+ 	score -2
+ 
+ AI_CV_SpAtkDown4: @ 81DAF77
+-	get_type ENEMY_TYPE1
+-	if_in_bytes AI_CV_SpAtkDown_SpecialTypeList, AI_CV_SpAtkDown_End
+-	get_type PLAYER_TYPE1
+-	if_in_bytes AI_CV_SpAtkDown_SpecialTypeList, AI_CV_SpAtkDown_End
++	if_target_special_attacker AI_CV_SpAtkDown_End
+ 	if_random_less_than 50, AI_CV_SpAtkDown_End
+ 	score -2
+ 
+ AI_CV_SpAtkDown_End: @ 81DAF95
+ 	end
+ 
+-AI_CV_SpAtkDown_SpecialTypeList: @ 81DAF96
+-	.byte TYPE_FIRE
+-	.byte TYPE_WATER
+-	.byte TYPE_GRASS
+-	.byte TYPE_ELECTRIC
+-	.byte TYPE_PSYCHIC
+-	.byte TYPE_ICE
+-	.byte TYPE_DRAGON
+-	.byte TYPE_DARK
+-	.byte -1
+-
+ AI_CV_SpDefDown: @ 81DAF9F
+ 	if_hp_less_than USER, 70, AI_CV_SpDefDown2
+ 	if_stat_level_more_than TARGET, SP_DEFENSE, 3, AI_CV_SpDefDown3
+@@ -1427,10 +1376,7 @@ AI_CV_Toxic_End: @ 81DB242
+ 
+ AI_CV_LightScreen: @ 81DB243
+ 	if_hp_less_than USER, 50, AI_CV_LightScreen_ScoreDown2
+-	get_type ENEMY_TYPE1
+-	if_in_bytes AI_CV_LightScreen_SpecialTypeList, AI_CV_LightScreen_End
+-	get_type PLAYER_TYPE1
+-	if_in_bytes AI_CV_LightScreen_SpecialTypeList, AI_CV_LightScreen_End
++	if_target_special_attacker AI_CV_LightScreen_End
+ 	if_random_less_than 50, AI_CV_LightScreen_End
+ 
+ AI_CV_LightScreen_ScoreDown2: @ 81DB266
+@@ -1439,17 +1385,6 @@ AI_CV_LightScreen_ScoreDown2: @ 81DB266
+ AI_CV_LightScreen_End: @ 81DB268
+ 	end
+ 
+-AI_CV_LightScreen_SpecialTypeList: @ 81DB269
+-	.byte TYPE_FIRE
+-	.byte TYPE_WATER
+-	.byte TYPE_GRASS
+-	.byte TYPE_ELECTRIC
+-	.byte TYPE_PSYCHIC
+-	.byte TYPE_ICE
+-	.byte TYPE_DRAGON
+-	.byte TYPE_DARK
+-	.byte -1
+-
+ AI_CV_Rest: @ 81DB272
+ 	if_would_go_first USER, AI_CV_Rest4
+ 	if_hp_not_equal USER, 100, AI_CV_Rest2
+@@ -1543,10 +1478,7 @@ AI_CV_Confuse_End: @ 81DB363
+ 
+ AI_CV_Reflect: @ 81DB364
+ 	if_hp_less_than USER, 50, AI_CV_Reflect_ScoreDown2
+-	get_type ENEMY_TYPE1
+-	if_in_bytes AI_CV_Reflect_PhysicalTypeList, AI_CV_Reflect_End
+-	get_type PLAYER_TYPE1
+-	if_in_bytes AI_CV_Reflect_PhysicalTypeList, AI_CV_Reflect_End
++	if_target_physical_attacker AI_CV_Reflect_End
+ 	if_random_less_than 50, AI_CV_Reflect_End
+ 
+ AI_CV_Reflect_ScoreDown2: @ 81DB387
+@@ -1555,18 +1487,6 @@ AI_CV_Reflect_ScoreDown2: @ 81DB387
+ AI_CV_Reflect_End: @ 81DB389
+ 	end
+ 
+-AI_CV_Reflect_PhysicalTypeList: @ 81DB38A
+-	.byte TYPE_NORMAL
+-	.byte TYPE_FIGHTING
+-	.byte TYPE_FLYING
+-	.byte TYPE_POISON
+-	.byte TYPE_GROUND
+-	.byte TYPE_ROCK
+-	.byte TYPE_BUG
+-	.byte TYPE_GHOST
+-	.byte TYPE_STEEL
+-	.byte -1
+-
+ AI_CV_Poison: @ 81DB394
+ 	if_hp_less_than USER, 50, AI_CV_Poison_ScoreDown1
+ 	if_hp_more_than TARGET, 50, AI_CV_Poison_End
+@@ -1703,8 +1623,8 @@ AI_CV_Counter3: @ 81DB4FE
+ 
+ AI_CV_Counter4: @ 81DB514
+ 	get_move TARGET
+-	get_move_type_from_result
+-	if_not_in_bytes AI_CV_Counter_PhysicalTypeList, AI_CV_Counter_ScoreDown1
++	get_move_split_from_result
++	if_not_equal SPLIT_PHYSICAL, AI_CV_Counter_ScoreDown1
+ 	if_random_less_than 100, AI_CV_Counter_End
+ 	score +1
+ 	jump AI_CV_Counter_End
+@@ -1715,10 +1635,7 @@ AI_CV_Counter5: @ 81DB52D
+ 	score +1
+ 
+ AI_CV_Counter6: @ 81DB53A
+-	get_type ENEMY_TYPE1
+-	if_in_bytes AI_CV_Counter_PhysicalTypeList, AI_CV_Counter_End
+-	get_type PLAYER_TYPE1
+-	if_in_bytes AI_CV_Counter_PhysicalTypeList, AI_CV_Counter_End
++	if_target_physical_attacker AI_CV_Counter_End
+ 	if_random_less_than 50, AI_CV_Counter_End
+ 
+ AI_CV_Counter_ScoreDown1: @ 81DB556
+@@ -1727,18 +1644,6 @@ AI_CV_Counter_ScoreDown1: @ 81DB556
+ AI_CV_Counter_End: @ 81DB558
+ 	end
+ 
+-AI_CV_Counter_PhysicalTypeList: @ 81DB559
+-	.byte TYPE_NORMAL
+-	.byte TYPE_FIGHTING
+-	.byte TYPE_FLYING
+-	.byte TYPE_POISON
+-	.byte TYPE_GROUND
+-	.byte TYPE_ROCK
+-	.byte TYPE_BUG
+-	.byte TYPE_GHOST
+-	.byte TYPE_STEEL
+-	.byte -1
+-
+ AI_CV_Encore: @ 81DB563
+ 	if_last_move_did_damage TARGET, 0, AI_CV_Encore2
+ 	if_would_go_first USER, AI_CV_Encore_ScoreDown2
+@@ -2206,8 +2111,8 @@ AI_CV_MirrorCoat3: @ 81DBA09
+ 
+ AI_CV_MirrorCoat4: @ 81DBA1F
+ 	get_move TARGET
+-	get_move_type_from_result
+-	if_not_in_bytes AI_CV_MirrorCoat_SpecialTypeList, AI_CV_MirrorCoat_ScoreDown1
++	get_move_split_from_result
++	if_not_equal SPLIT_SPECIAL, AI_CV_MirrorCoat_ScoreDown1
+ 	if_random_less_than 100, AI_CV_MirrorCoat_End
+ 	score +1
+ 	jump AI_CV_MirrorCoat_End
+@@ -2218,10 +2123,7 @@ AI_CV_MirrorCoat5: @ 81DBA38
+ 	score +1
+ 
+ AI_CV_MirrorCoat6: @ 81DBA45
+-	get_type ENEMY_TYPE1
+-	if_in_bytes AI_CV_MirrorCoat_SpecialTypeList, AI_CV_MirrorCoat_End
+-	get_type PLAYER_TYPE1
+-	if_in_bytes AI_CV_MirrorCoat_SpecialTypeList, AI_CV_MirrorCoat_End
++	if_target_special_attacker AI_CV_MirrorCoat_End
+ 	if_random_less_than 50, AI_CV_MirrorCoat_End
+ 
+ AI_CV_MirrorCoat_ScoreDown1: @ 81DBA61
+@@ -2230,17 +2132,6 @@ AI_CV_MirrorCoat_ScoreDown1: @ 81DBA61
+ AI_CV_MirrorCoat_End: @ 81DBA63
+ 	end
+ 
+-AI_CV_MirrorCoat_SpecialTypeList: @ 81DBA64
+-	.byte TYPE_FIRE
+-	.byte TYPE_WATER
+-	.byte TYPE_GRASS
+-	.byte TYPE_ELECTRIC
+-	.byte TYPE_PSYCHIC
+-	.byte TYPE_ICE
+-	.byte TYPE_DRAGON
+-	.byte TYPE_DARK
+-	.byte -1
+-
+ AI_CV_ChargeUpMove: @ 81DBA6D
+ 	if_damage_bonus 10, AI_CV_ChargeUpMove_ScoreDown2
+ 	if_damage_bonus 20, AI_CV_ChargeUpMove_ScoreDown2
 diff --git a/graphics/types/split_physical.png b/graphics/types/split_physical.png
 new file mode 100644
 index 0000000000000000000000000000000000000000..1f7d92a92de3afe60b0978ac27dc75731683c207
@@ -68,23 +333,53 @@ index 08b7d517b6c83f14a6490c76d9e498054ae049e5..1644b4446ae02f11055a00eb09290882
  
  #define TARGET_TURN_DAMAGED (((gSpecialStatuses[gBattlerTarget].physicalDmg || gSpecialStatuses[gBattlerTarget].specialDmg)))
  
-diff --git a/include/pokemon.h b/include/pokemon.h
-index 4c653a8e5d6c05a76cfd6d11c59f454eb8c76fed..d5ca72fc909021d37130b005a89799490f03f5b1 100644
---- a/include/pokemon.h
-+++ b/include/pokemon.h
-@@ -307,6 +307,11 @@ struct BaseStats
-              u8 noFlip:1;
- };
+diff --git a/include/constants/pokemon.h b/include/constants/pokemon.h
+index d1cec4461a3927ac0f8f7bb8be984296674b30e0..03a9689e3ef1512c77e187d08600f364d91ee26d 100644
+--- a/include/constants/pokemon.h
++++ b/include/constants/pokemon.h
+@@ -149,4 +149,9 @@
+ #define PLAYER_HAS_ONE_MON             1
+ #define PLAYER_HAS_ONE_USABLE_MON      2
  
 +// Move damage categories (Gen 4 physical/special split)
 +#define SPLIT_PHYSICAL 0
 +#define SPLIT_SPECIAL  1
 +#define SPLIT_STATUS   2
 +
- struct BattleMove
- {
-     u8 effect;
-@@ -318,6 +323,7 @@ struct BattleMove
+ #endif // GUARD_CONSTANTS_POKEMON_H
+diff --git a/include/macros/battle_ai_script.inc b/include/macros/battle_ai_script.inc
+index 679e303409fe1647ff6ce373ed7914da35021fdc..c9cfe350e11e2d2eb1b9a30f33a1086ab42e476b 100644
+--- a/include/macros/battle_ai_script.inc
++++ b/include/macros/battle_ai_script.inc
+@@ -480,18 +480,20 @@
+ 	.endm
+ 
+ 	@ nullsub
+-	.macro ai_52
++	.macro get_move_split_from_result
+ 	.byte 0x52
+ 	.endm
+ 
+ 	@ nullsub
+-	.macro ai_53
++	.macro if_target_physical_attacker ptr:req
+ 	.byte 0x53
++	.4byte \ptr
+ 	.endm
+ 
+ 	@ nullsub
+-	.macro ai_54
++	.macro if_target_special_attacker ptr:req
+ 	.byte 0x54
++	.4byte \ptr
+ 	.endm
+ 
+ 	@ nullsub
+diff --git a/include/pokemon.h b/include/pokemon.h
+index 4c653a8e5d6c05a76cfd6d11c59f454eb8c76fed..e2770969b674df2a50bbbe5352460fd414ea68ee 100644
+--- a/include/pokemon.h
++++ b/include/pokemon.h
+@@ -318,6 +318,7 @@ struct BattleMove
      u8 target;
      s8 priority;
      u8 flags;
@@ -130,6 +425,265 @@ index 589a60b73cae782a028b0663a5378ec2e92d2b35..a3ad47d91cdbeb3db3ee3ca3e323fb62
  	@cat $^ >$@
  
  $(TYPESGFXDIR)/move_types.gbapal: $(TYPESGFXDIR)/move_types_1.gbapal $(TYPESGFXDIR)/move_types_2.gbapal $(TYPESGFXDIR)/move_types_3.gbapal
+diff --git a/patch_tools/ai_test/ai_read.py b/patch_tools/ai_test/ai_read.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..84abc1c0e10ab751a7ce5427abe3627d89516c46
+--- /dev/null
++++ b/patch_tools/ai_test/ai_read.py
+@@ -0,0 +1,48 @@
++#!/usr/bin/env python3
++"""Connect to mGBA's GDB stub, stop at TestAiDone() and print gTestAiScore
++(one line per scenario, four summed move scores each).
++
++  python3 ai_read.py <TestAiDone address hex> <gTestAiScore address hex>
++"""
++import socket, sys, time
++
++SCENARIOS, MOVES = 4, 4   # matches sAiTestScenarios in test_ai.inc
++bp, addr = int(sys.argv[1], 16), int(sys.argv[2], 16)
++
++for _ in range(60):                       # wait for mGBA to open its GDB port
++    try:
++        s = socket.create_connection(('127.0.0.1', 2345))
++        break
++    except OSError:
++        time.sleep(0.5)
++s.settimeout(120)
++buf = b''
++
++def recv_packet():
++    """Read one $...#xx packet and acknowledge it."""
++    global buf
++    while True:
++        i = buf.find(b'$')
++        if i >= 0:
++            j = buf.find(b'#', i)
++            if j >= 0 and len(buf) >= j + 3:
++                pkt, buf = buf[i + 1:j], buf[j + 3:]
++                s.sendall(b'+')
++                return pkt.decode()
++        data = s.recv(65536)
++        if not data:
++            raise EOFError
++        buf += data
++
++def cmd(c):
++    p = c.encode()
++    s.sendall(b'$' + p + b'#' + b'%02x' % (sum(p) & 255))
++    return recv_packet()
++
++cmd('?')
++cmd('Z0,%x,2' % bp)                       # breakpoint on TestAiDone (Thumb code)
++cmd('c')                                  # run until it is hit
++data = bytes.fromhex(cmd('m%x,%x' % (addr, SCENARIOS * MOVES * 4)))
++for sc in range(SCENARIOS):
++    row = data[sc * MOVES * 4:(sc + 1) * MOVES * 4]
++    print(*[int.from_bytes(row[i:i + 4], 'little', signed=True) for i in range(0, MOVES * 4, 4)])
+diff --git a/patch_tools/ai_test/ai_report.py b/patch_tools/ai_test/ai_report.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..58fe9495b0a8eef95cca80669c5bcd3488cf3250
+--- /dev/null
++++ b/patch_tools/ai_test/ai_report.py
+@@ -0,0 +1,29 @@
++#!/usr/bin/env python3
++"""Print the before/after table from two ai_read.py outputs.
++
++  python3 ai_report.py before.txt after.txt
++"""
++import sys
++
++TRIALS = 256   # AI_TEST_TRIALS in test_ai.inc
++# (description, the AI's four moves, how many of them to report); same order as sAiTestScenarios.
++# The unreported moves are filler.
++SCENARIOS = [
++    ('vs Gengar-like (Ghost/Poison, Sp. Atk > Attack)', ['Reflect', 'Light Screen', 'Growl', 'Tackle'], 3),
++    ('vs Gyarados-like (Water/Flying, Attack > Sp. Atk)', ['Reflect', 'Light Screen', 'Growl', 'Tackle'], 3),
++    ('after the target used Shadow Ball', ['Counter', 'Tackle', 'Growl', 'Tail Whip'], 1),
++    ('after the target used Crunch', ['Mirror Coat', 'Tackle', 'Growl', 'Tail Whip'], 1),
++]
++
++def load(path):
++    return [[int(x) for x in line.split()] for line in open(path) if line.strip()]
++
++before, after = load(sys.argv[1]), load(sys.argv[2])
++print('Average change to each move\'s score from the AI\'s viability script')
++print('(%d runs each; higher = the AI likes the move more)\n' % TRIALS)
++print('| Situation | Move | Before | After |')
++print('|---|---|---|---|')
++for i, (desc, moves, shown) in enumerate(SCENARIOS):
++    for j, move in enumerate(moves[:shown]):
++        b, a = before[i][j] / TRIALS - 100, after[i][j] / TRIALS - 100
++        print('| %s | %s | %+.2f | %+.2f |' % (desc, move, b, a))
+diff --git a/patch_tools/ai_test/run_ai_test.sh b/patch_tools/ai_test/run_ai_test.sh
+new file mode 100755
+index 0000000000000000000000000000000000000000..867d9b13e577dc70cafd731ae763514f6e5a0a1c
+--- /dev/null
++++ b/patch_tools/ai_test/run_ai_test.sh
+@@ -0,0 +1,48 @@
++#!/usr/bin/env bash
++# Measures how the trainer AI scores Reflect, Light Screen, Growl, Counter and
++# Mirror Coat in a few fixed situations, before and after this patch.
++#
++#   patch_tools/ai_test/run_ai_test.sh [ruby|ruby_rev1|ruby_rev2|sapphire|sapphire_rev1|sapphire_rev2]
++#
++# Builds two throwaway copies of the game: "before" is the untouched upstream
++# code at HEAD, "after" is this working copy. Both get test_ai.inc, which runs
++# the AI's scoring script many times at boot. Each copy runs in mGBA with the GDB
++# stub, ai_read.py reads the scores, and ai_report.py prints a before/after table.
++# The real source tree is not touched.
++set -euo pipefail
++REPO="$(cd "$(dirname "$0")/../.." && pwd)"
++HERE="$REPO/patch_tools/ai_test"
++MGBA="${MGBA:-/Applications/mGBA.app/Contents/MacOS/mGBA}"
++TARGET="${1:-ruby_rev2}"
++WORK="$(mktemp -d)"
++MGBA_PID=""
++trap 'kill $MGBA_PID 2>/dev/null || true; rm -rf "$WORK"' EXIT
++
++mkdir "$WORK/before"
++git -C "$REPO" archive HEAD | tar -x -C "$WORK/before"
++rsync -a --exclude /build --exclude '/*.gba' --exclude '/*.elf' --exclude '/patch_tools/*/out' "$REPO/" "$WORK/after/"
++for tree in before after; do
++    cd "$WORK/$tree"
++    rsync -a "$REPO/tools/agbcc/" tools/agbcc/
++    cp "$HERE/test_ai.inc" src/
++    # Include the test after main.c's last #include, and run it before the main loop
++    python3 -I - src/main.c <<'PY'
++import re, sys
++p = sys.argv[1]; s = open(p).read()
++last = [m.end() for m in re.finditer(r'^#include .*$', s, re.M)][-1]
++s = s[:last] + '\n#include "test_ai.inc"' + s[last:]
++assert s.count('\n    for (;;)\n') == 1
++s = s.replace('\n    for (;;)\n', '\n    TestAi();\n    for (;;)\n')
++open(p, 'w').write(s)
++PY
++    echo "== building $tree"
++    make -j8 "$TARGET" > build.log 2>&1 || { tail -20 build.log; exit 1; }
++    ELF="$WORK/$tree/poke$TARGET.elf"
++    BP=$(arm-none-eabi-nm "$ELF" | awk '$3=="TestAiDone"{print $1}')
++    SCORES=$(arm-none-eabi-nm "$ELF" | awk '$3=="gTestAiScore"{print $1}')
++    "$MGBA" -g "${ELF%.elf}.gba" > /dev/null 2>&1 &
++    MGBA_PID=$!
++    python3 -I "$HERE/ai_read.py" "$BP" "$SCORES" > "$WORK/$tree.txt"
++    kill $MGBA_PID; wait $MGBA_PID 2>/dev/null || true; MGBA_PID=""
++done
++python3 -I "$HERE/ai_report.py" "$WORK/before.txt" "$WORK/after.txt"
+diff --git a/patch_tools/ai_test/test_ai.inc b/patch_tools/ai_test/test_ai.inc
+new file mode 100644
+index 0000000000000000000000000000000000000000..1d4bcfd7a58ad0d5901f606eed9ca2922b81eadf
+--- /dev/null
++++ b/patch_tools/ai_test/test_ai.inc
+@@ -0,0 +1,110 @@
++// Trainer AI category test. run_ai_test.sh includes this file at the end of
++// src/main.c's includes and calls TestAi() once at boot, before the main loop.
++//
++// Each scenario puts the AI's Pokemon (battler 1) against a target (battler 0)
++// with the given types, Attack / Sp. Atk and last used move, then runs the AI's
++// "check viability" script AI_TEST_TRIALS times. gTestAiScore holds the summed
++// score of each of the AI's four moves (each trial starts every move at 100).
++#include "battle.h"
++#include "battle_ai_script_commands.h"
++#include "random.h"
++#include "constants/battle.h"
++#include "constants/moves.h"
++#include "constants/pokemon.h"
++#include "ewram.h"
++extern u16 gBattleTypeFlags;
++extern u8 gActiveBattler;
++extern u8 gBattlersCount;
++extern u8 gBattlerPositions[MAX_BATTLERS_COUNT];
++extern u8 gAbsentBattlerFlags;
++extern u16 gLastMoves[MAX_BATTLERS_COUNT];
++extern struct BattlePokemon gBattleMons[MAX_BATTLERS_COUNT];
++
++#define AI_TEST_TRIALS 256
++
++struct AiTestScenario
++{
++    u8 type1, type2;
++    u16 attack, spAttack;
++    u16 lastMove;
++    u16 moves[MAX_MON_MOVES];
++};
++
++// Keep in sync with SCENARIOS in ai_report.py
++static const struct AiTestScenario sAiTestScenarios[] =
++{
++    // Gengar-like: Ghost/Poison types (old "physical" types), but a special attacker
++    {TYPE_GHOST, TYPE_POISON,  85, 150, MOVE_NONE,        {MOVE_REFLECT, MOVE_LIGHT_SCREEN, MOVE_GROWL, MOVE_TACKLE}},
++    // Gyarados-like: Water/Flying (one old "special" and one old "physical" type), a physical attacker
++    {TYPE_WATER, TYPE_FLYING, 145,  80, MOVE_NONE,        {MOVE_REFLECT, MOVE_LIGHT_SCREEN, MOVE_GROWL, MOVE_TACKLE}},
++    // The target just used Shadow Ball (Ghost: old physical, now special)
++    {TYPE_GHOST, TYPE_POISON,  85, 150, MOVE_SHADOW_BALL, {MOVE_COUNTER, MOVE_TACKLE, MOVE_GROWL, MOVE_TAIL_WHIP}},
++    // The target just used Crunch (Dark: old special, now physical)
++    {TYPE_ROCK,  TYPE_DARK,   154, 115, MOVE_CRUNCH,      {MOVE_MIRROR_COAT, MOVE_TACKLE, MOVE_GROWL, MOVE_TAIL_WHIP}},
++};
++
++s32 gTestAiScore[ARRAY_COUNT(sAiTestScenarios)][MAX_MON_MOVES];
++
++// run_ai_test.sh stops here to read gTestAiScore
++void TestAiDone(void)
++{
++}
++
++static void TestAiSetupMon(struct BattlePokemon *mon)
++{
++    u32 i;
++
++    memset(mon, 0, sizeof(*mon));
++    mon->species = 1;
++    mon->level = 50;
++    mon->hp = mon->maxHP = 150;
++    mon->attack = mon->defense = mon->speed = mon->spAttack = mon->spDefense = 100;
++    for (i = 0; i < 8; i++)
++        mon->statStages[i] = 6;
++}
++
++void TestAi(void)
++{
++    u32 s, t, i;
++
++    gRngValue = 0x12345678; // same random numbers for every build
++    for (s = 0; s < ARRAY_COUNT(sAiTestScenarios); s++)
++    {
++        const struct AiTestScenario *sc = &sAiTestScenarios[s];
++
++        for (i = 0; i < MAX_MON_MOVES; i++)
++            gTestAiScore[s][i] = 0;
++        for (t = 0; t < AI_TEST_TRIALS; t++)
++        {
++            memset(gDisableStructs, 0, sizeof(gDisableStructs));
++            gBattleTypeFlags = BATTLE_TYPE_TRAINER;
++            gBattlersCount = 2;
++            gBattlerPositions[0] = B_POSITION_PLAYER_LEFT;
++            gBattlerPositions[1] = B_POSITION_OPPONENT_LEFT;
++            gAbsentBattlerFlags = 0;
++
++            TestAiSetupMon(&gBattleMons[0]); // the target
++            gBattleMons[0].type1 = sc->type1;
++            gBattleMons[0].type2 = sc->type2;
++            gBattleMons[0].attack = sc->attack;
++            gBattleMons[0].spAttack = sc->spAttack;
++            gLastMoves[0] = sc->lastMove;
++
++            TestAiSetupMon(&gBattleMons[1]); // the AI's Pokemon
++            for (i = 0; i < MAX_MON_MOVES; i++)
++            {
++                gBattleMons[1].moves[i] = sc->moves[i];
++                gBattleMons[1].pp[i] = 20;
++            }
++            gLastMoves[1] = MOVE_NONE;
++
++            gActiveBattler = 1;
++            BattleAI_SetupAIData();
++            AI_THINKING_STRUCT->aiFlags = 1 << 1; // only the "check viability" script
++            BattleAI_GetAIActionToUse();
++            for (i = 0; i < MAX_MON_MOVES; i++)
++                gTestAiScore[s][i] += AI_THINKING_STRUCT->score[i];
++        }
++    }
++    TestAiDone();
++}
 diff --git a/patch_tools/bps.py b/patch_tools/bps.py
 new file mode 100644
 index 0000000000000000000000000000000000000000..1a35601b4bc91ad9a4ec81d371f7c83d2ad37822
@@ -905,6 +1459,70 @@ index 0000000000000000000000000000000000000000..c50413b47564c48423b477c2f931ee43
 +    rm "$f"
 +done
 +echo "Screens written to $HERE/out/"
+diff --git a/src/battle_ai_script_commands.c b/src/battle_ai_script_commands.c
+index f83691d7f4df19c36cc196f135370e89708fe86a..d2a3c88f65435fe4a6b9bef5efd486c525f03f79 100644
+--- a/src/battle_ai_script_commands.c
++++ b/src/battle_ai_script_commands.c
+@@ -133,9 +133,9 @@ static void BattleAICmd_get_move_type_from_result(void);
+ static void BattleAICmd_get_move_power_from_result(void);
+ static void BattleAICmd_get_move_effect_from_result(void);
+ static void BattleAICmd_get_protect_count(void);
+-static void BattleAICmd_nullsub_52(void);
+-static void BattleAICmd_nullsub_53(void);
+-static void BattleAICmd_nullsub_54(void);
++static void BattleAICmd_get_move_split_from_result(void);
++static void BattleAICmd_if_target_physical_attacker(void);
++static void BattleAICmd_if_target_special_attacker(void);
+ static void BattleAICmd_nullsub_55(void);
+ static void BattleAICmd_nullsub_56(void);
+ static void BattleAICmd_nullsub_57(void);
+@@ -232,9 +232,9 @@ static const BattleAICmdFunc sBattleAICmdTable[] =
+     BattleAICmd_get_move_power_from_result,  // 0x4F
+     BattleAICmd_get_move_effect_from_result, // 0x50
+     BattleAICmd_get_protect_count,           // 0x51
+-    BattleAICmd_nullsub_52,                  // 0x52
+-    BattleAICmd_nullsub_53,                  // 0x53
+-    BattleAICmd_nullsub_54,                  // 0x54
++    BattleAICmd_get_move_split_from_result,  // 0x52
++    BattleAICmd_if_target_physical_attacker, // 0x53
++    BattleAICmd_if_target_special_attacker,  // 0x54
+     BattleAICmd_nullsub_55,                  // 0x55
+     BattleAICmd_nullsub_56,                  // 0x56
+     BattleAICmd_nullsub_57,                  // 0x57
+@@ -1798,16 +1798,30 @@ static void BattleAICmd_get_protect_count(void)
+     gAIScriptPtr += 2;
+ }
+ 
+-static void BattleAICmd_nullsub_52(void)
++// Sets the result to the category (SPLIT_*) of the move in the result
++static void BattleAICmd_get_move_split_from_result(void)
+ {
++    AI_THINKING_STRUCT->funcResult = gBattleMoves[AI_THINKING_STRUCT->funcResult].split;
++
++    gAIScriptPtr += 1;
+ }
+ 
+-static void BattleAICmd_nullsub_53(void)
++// Jumps if the target's Attack is at least its Sp. Atk (it probably attacks physically)
++static void BattleAICmd_if_target_physical_attacker(void)
+ {
++    if (gBattleMons[gBattlerTarget].attack >= gBattleMons[gBattlerTarget].spAttack)
++        gAIScriptPtr = T1_READ_PTR(gAIScriptPtr + 1);
++    else
++        gAIScriptPtr += 5;
+ }
+ 
+-static void BattleAICmd_nullsub_54(void)
++// Jumps if the target's Sp. Atk is at least its Attack (it probably attacks specially)
++static void BattleAICmd_if_target_special_attacker(void)
+ {
++    if (gBattleMons[gBattlerTarget].spAttack >= gBattleMons[gBattlerTarget].attack)
++        gAIScriptPtr = T1_READ_PTR(gAIScriptPtr + 1);
++    else
++        gAIScriptPtr += 5;
+ }
+ 
+ static void BattleAICmd_nullsub_55(void)
 diff --git a/src/battle_script_commands.c b/src/battle_script_commands.c
 index c270710e2c12340423ac31d11e9703f030a99207..bfb8121e36c4bbab7b5c9fbaa715a0d33d9f191a 100644
 --- a/src/battle_script_commands.c

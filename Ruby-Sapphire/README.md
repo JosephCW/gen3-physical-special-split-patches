@@ -1,15 +1,12 @@
-# Pokémon Ruby & Sapphire: Physical/Special Split patch
+# Ruby & Sapphire
 
-This patch gives Pokémon Ruby and Sapphire the **Gen 4 physical/special split**. Each
-move is Physical, Special or Status based on what the move is, not on its type, using its
-Diamond/Pearl/Platinum category. The game also **shows each move's category in-game**.
+Patches, screenshots and source changes for Ruby & Sapphire. See the [main
+README](../README.md) for how to apply a patch, what changed in battle, how to build, and
+how the screenshots were made.
 
-![Category icons (top) next to the Fight / Water / Steel icons (bottom)](screenshots/category_icons_closeup.png)
+![Category badges (top) next to the Fight / Water / Steel icons (bottom)](screenshots/category_icons_closeup.png)
 
-> **Other games:** see the [overview](../README.md) for FireRed/LeafGreen,
-> Ruby/Sapphire and Emerald.
-
-## Compatible games
+## Supported ROMs
 
 | Patch file | Use it on | CRC32 | SHA-1 |
 |---|---|---|---|
@@ -21,43 +18,12 @@ Diamond/Pearl/Platinum category. The game also **shows each move's category in-g
 | `Sapphire_PhysSpecSplit_v1.2.bps` | **Pokémon Sapphire Version (USA, Europe) (Rev 2)** | `9CC4410E` | `89b45fb172e6b55d51fc0e61989775187f6fe63c` |
 
 * Use the **Ruby** patches on Ruby and the **Sapphire** patches on Sapphire, and pick the
-  one for your revision. Your ROMs in Downloads are **Rev 2**, so use the `v1.2` patches.
-* The ROM must be a **clean, unmodified, English (USA, Europe)** dump. The patches do
-  **not** work on other languages, or on a ROM that's already patched or hacked.
-* Not sure which revision you have? A ROM's file name usually says "(Rev 1)" or
-  "(Rev 2)"; otherwise compare its CRC32 (Rom Patcher JS shows it) or SHA-1
-  (`shasum rom.gba`) with the table. BPS patches check the original ROM's checksum, so a
-  patcher will refuse the wrong one.
-* The patch doesn't change the save format, so **existing Ruby/Sapphire saves keep
-  working**. Back up your `.sav` first anyway.
+  one for your revision.
+* Only the **English (USA, Europe)** releases are supported, not other languages.
+* Not sure which revision you have? The ROM's file name usually says "(Rev 1)" or
+  "(Rev 2)". Otherwise compare its CRC32 or SHA-1 with the table.
 
-## How to apply the patch
-
-Choose any of these:
-
-**Rom Patcher JS (browser, any OS):**
-1. Open <https://www.marcrobledo.com/RomPatcher.js/>.
-2. *ROM file*: choose your clean Ruby or Sapphire `.gba`.
-3. *Patch file*: choose the matching `.bps` from this folder.
-4. Click **Apply patch** and save the new `.gba`.
-
-**Floating IPS (Flips), Windows/Linux:**
-1. Open Flips and click **Apply Patch**.
-2. Select the `.bps`, then your clean ROM, then choose where to save the patched ROM.
-
-**mGBA soft-patching (no new file is written):**
-* Put the `.bps` next to the ROM with the **same file name**, e.g.
-  `Pokemon Ruby.gba` + `Pokemon Ruby.bps`. mGBA applies it on load.
-* Or from a terminal: `mGBA -p Ruby_PhysSpecSplit_v1.2.bps "Pokemon Ruby.gba"`.
-
-**Command line (Python 3, included here):**
-```sh
-python3 ../bps.py apply "Pokemon Ruby.gba" Ruby_PhysSpecSplit_v1.2.bps "Ruby Split.gba"
-```
-
-Then play the patched `.gba` in any GBA emulator or on a flash cart.
-
-## What you'll see in-game
+## In-game
 
 **Summary screen → BATTLE MOVES → press A on a move.** A PHYS / SPEC / STATUS badge appears
 at the right end of the DESCRIPTION header, next to the move's description and POWER /
@@ -87,61 +53,20 @@ empty space beside the bag (they hide on CLOSE BAG and in the other pockets).
 |---|---|---|
 | ![](screenshots/bag_tm_toxic_status.png) | ![](screenshots/bag_tm_earthquake_physical.png) | ![](screenshots/bag_tm_flamethrower_special.png) |
 
-(The summary and Move Tutor screenshots are from Sapphire and the Bag ones from Ruby; the
-two games look the same apart from the bag colour. They were rendered from the
-emulator's video memory by the visual test below.)
+(The summary and Move Tutor screenshots are from Sapphire and the Bag ones from Ruby;
+the two games look the same apart from the bag colour.)
 
-## What changed in battle
+## Source changes
 
-* Each move has a category (`split`) taken from its Gen 4 category.
-* Damage uses **Attack/Defense for Physical moves and Sp. Atk/Sp. Def for Special moves**,
-  whatever the move's type. Reflect, Light Screen, burn, Guts, Hustle, Huge/Pure Power,
-  Choice Band, crits that ignore stat stages, etc. all follow the category.
-* **Counter** reflects Physical hits and **Mirror Coat** reflects Special hits.
-* Type-boosting held items (Charcoal, Mystic Water, …) boost the stat that matches the
-  move's category.
-* Hidden Power and Weather Ball are always Special (as in Gen 4), whatever their type.
-
-**28 moves are now Physical** (were Special): Fire Punch, Ice Punch, Thunder Punch, Vine
-Whip, Bite, Razor Leaf, Waterfall, Clamp, Crabhammer, Thief, Flame Wheel, Faint Attack,
-Outrage, Spark, Sacred Fire, Pursuit, Crunch, Beat Up, Knock Off, Dive, Blaze Kick, Ice
-Ball, Needle Arm, Bullet Seed, Icicle Spear, Dragon Claw, Volt Tackle, Leaf Blade.
-
-**26 moves are now Special** (were Physical): Razor Wind, Gust, Sonic Boom, Acid, Hyper
-Beam, Night Shade, Smog, Sludge, Swift, Tri Attack, Snore, Aeroblast, Sludge Bomb, Mud
-Slap, Hidden Power, Ancient Power, Shadow Ball, Uproar, Spit Up, Hyper Voice, Weather
-Ball, Air Cutter, Silver Wind, Signal Beam, Mud Shot, Doom Desire.
-
-Every other move keeps the category it already had.
-
-### Known limitations
-
-* The category isn't shown in the battle move menu. Check a move's category from the party
-  summary screen or the Bag's TMs & HMs pocket.
-* A few of the enemy AI's move-scoring hints still use the old type-based idea of
-  physical/special, e.g. whether a Defense- or Sp. Def-raising move is worth using against
-  your Pokémon's types. This only slightly changes which moves the AI likes to pick.
-  Damage is always calculated correctly.
-
----
-
-# Updating or modifying the patch
-
-The patches are built from the [pret/pokeruby](https://github.com/pret/pokeruby)
-decompilation, which builds byte-identical Ruby and Sapphire ROMs (every revision). Both
-games share the same source, so one set of changes covers all six patches. This repository stores the changes as `source/phys-spec-split.diff`, against the upstream
-commit listed in [`games.txt`](../games.txt). To change the patch, make a working copy of
-the decomp with the changes applied, edit the C source there, rebuild, and export the
-result back here.
-
-## Files changed
-
-[`source/phys-spec-split.diff`](source/phys-spec-split.diff) has every change (or run
-`git diff` in your working copy). In brief:
+Built from [pret/pokeruby](https://github.com/pret/pokeruby) at commit
+`5784633ce4ef7ade1a7f2d2d0c288e3d5e6cdd7f`. Every change is in
+[`source/phys-spec-split.diff`](source/phys-spec-split.diff), including the build and test
+tools under `patch_tools/`.
 
 | File | Change |
 |---|---|
-| `include/pokemon.h` | `SPLIT_PHYSICAL` / `SPLIT_SPECIAL` / `SPLIT_STATUS` constants and a new `u8 split;` field in `struct BattleMove` (uses existing padding; still 12 bytes per move) |
+| `include/constants/pokemon.h` | `SPLIT_PHYSICAL` / `SPLIT_SPECIAL` / `SPLIT_STATUS` constants (here so the AI script can use them too) |
+| `include/pokemon.h` | new `u8 split;` field in `struct BattleMove` (uses existing padding; still 12 bytes per move) |
 | `src/data/battle_moves.c` | `.split = SPLIT_…,` added to every move |
 | `include/battle.h` | `IS_MOVE_PHYSICAL(move)` / `IS_MOVE_SPECIAL(move)` replace the old type-based macros |
 | `src/calculate_base_damage.c` | `CalculateBaseDamage` picks stats by the move's category |
@@ -152,9 +77,11 @@ result back here.
 | `src/move_tutor_menu.c` | Move Tutor: POWER/ACCURACY rows moved up and a category row added (`sMoveInfoTextCoords`, `PrintMoveInfo` case 8) |
 | `include/pokemon_summary_screen.h` | shares the move type icon sprite sheet/animations/palette map (`gSpriteSheet_MoveTypes` etc.) with the bag |
 | `src/item_menu.c` | Bag TMs & HMs pocket: type + category icons (`LoadTmIconGfx`, `CreateTmIconSprites`, `SpriteCB_TmIcon`, which reads the selected item itself each frame) |
-| `patch_tools/` | patch builder, BPS tool, and visual test (below) |
+| `src/battle_ai_script_commands.c` | trainer AI: new script commands in the unused slots 0x52–0x54: `get_move_split_from_result`, `if_target_physical_attacker`, `if_target_special_attacker` (the target's Attack vs Sp. Atk) |
+| `include/macros/battle_ai_script.inc` | macros for those commands |
+| `data/battle_ai_scripts.s` | the AI's type lists for Reflect, Light Screen, Counter, Mirror Coat, Attack/Sp. Atk drops and Defense/Sp. Def boosts replaced by those commands |
 
-## Common edits
+### Common edits
 
 * **Change a move's category:** edit its `.split` in `src/data/battle_moves.c`, e.g.
   ```c
@@ -167,75 +94,16 @@ result back here.
   `pokemon_summary_screen.c`, or `TM_ICON_X` / `TM_ICON_Y` in `item_menu.c` for the Bag.
 * **Rename the Move Tutor text:** `sText_SplitPhysical` etc. in `move_tutor_menu.c`.
 
-## One-time setup (macOS)
+## Build targets
 
-From the top of this repository:
-```sh
-brew install arm-none-eabi-gcc arm-none-eabi-binutils libpng pkgconf
-./setup.sh ruby-sapphire
-```
-This clones [pret/pokeruby](https://github.com/pret/pokeruby) at the pinned commit into
-`work/pokeruby`, applies `source/phys-spec-split.diff`, and builds and installs pret's
-agbcc compiler. `work/` is ignored by git. (For Linux or Windows/WSL packages, see the
-decomp's `INSTALL.md`.)
+`./setup.sh ruby-sapphire` creates a working copy in `work/pokeruby`.
 
-## Rebuild the patches
+| Patch | `make` target | Built ROM | Vanilla `compare` target |
+|---|---|---|---|
+| `Ruby_PhysSpecSplit_v1.0.bps` | `ruby` | `pokeruby.gba` | `compare_ruby` |
+| `Ruby_PhysSpecSplit_v1.1.bps` | `ruby_rev1` | `pokeruby_rev1.gba` | `compare_ruby_rev1` |
+| `Ruby_PhysSpecSplit_v1.2.bps` | `ruby_rev2` | `pokeruby_rev2.gba` | `compare_ruby_rev2` |
+| `Sapphire_PhysSpecSplit_v1.0.bps` | `sapphire` | `pokesapphire.gba` | `compare_sapphire` |
+| `Sapphire_PhysSpecSplit_v1.1.bps` | `sapphire_rev1` | `pokesapphire_rev1.gba` | `compare_sapphire_rev1` |
+| `Sapphire_PhysSpecSplit_v1.2.bps` | `sapphire_rev2` | `pokesapphire_rev2.gba` | `compare_sapphire_rev2` |
 
-Pass whichever clean ROMs you have, from the list in "Compatible games", in any order. Zipped
-ROMs need unzipping first:
-
-```sh
-cd work/pokeruby
-patch_tools/make_patches.sh "/path/to/Pokemon - Ruby Version (USA, Europe) (Rev 2).gba" \
-                            "/path/to/Pokemon - Sapphire Version (USA, Europe) (Rev 2).gba"
-```
-
-The script identifies each ROM by its SHA-1 and rejects anything that isn't a clean
-supported ROM. It then builds the matching game (`make ruby`, `ruby_rev1`, `ruby_rev2`,
-`sapphire`, …), writes the `.bps` into `patches/`, and confirms the patch rebuilds the
-modified ROM exactly. Only the patches for the ROMs you pass are rebuilt. The ROMs are built in a fresh temporary copy of the source with every build output and
-generated graphic removed, so nothing left over from earlier builds can end up in a patch.
-The built ROMs are also copied to the repository root (`pokeruby_rev2.gba`,
-`pokesapphire_rev2.gba`, …) if you want to play them directly.
-
-Then copy your source changes and the new patches back into this repository:
-```sh
-../../export.sh ruby-sapphire
-```
-This rewrites `source/phys-spec-split.diff` and copies the `.bps` files into this folder.
-Commit both.
-
-To check that the original game still builds byte-for-byte (for example after updating
-the decomp), build the untouched upstream code in a separate checkout. Your changes and
-build files aren't affected:
-```sh
-cd work/pokeruby
-git worktree add --detach /tmp/vanilla-check HEAD
-cp -R tools/agbcc /tmp/vanilla-check/tools/
-make -C /tmp/vanilla-check -j8 compare_ruby_rev2
-make -C /tmp/vanilla-check -j8 compare_sapphire_rev2
-git worktree remove --force /tmp/vanilla-check
-```
-
-## Visual test (optional)
-
-```sh
-patch_tools/visual_test/run_visual_test.sh            # Ruby (Rev 2)
-patch_tools/visual_test/run_visual_test.sh sapphire   # Sapphire (Rev 2)
-```
-
-This builds a throwaway copy of the game with `harness.diff` applied. The copy plays
-itself to NEW GAME, opens the summary screen, the forget-a-move screen and the Move Tutor,
-and writes PNGs of each screen to `patch_tools/visual_test/out/`. It uses the
-[mGBA](https://mgba.io) app (`brew install --cask mgba-app`) and its GDB stub. An mGBA
-window opens for a minute or two while it runs. Your real source tree isn't changed. (The Bag
-screenshots came from a variant of the same harness that opens the TMs & HMs pocket instead.)
-
-To update the README screenshots, copy the PNGs you want from
-`patch_tools/visual_test/out/` into this folder's `screenshots/`.
-
-## Credits
-
-* [pret/pokeruby](https://github.com/pret/pokeruby) decompilation and
-  [pret/agbcc](https://github.com/pret/agbcc).
-* Move categories are from Generation 4, checked against Pokémon Showdown's move data.
