@@ -46,6 +46,13 @@ notes.
 
 ## How to apply a patch
 
+**You need your own ROM.** A `.bps` patch isn't a game: it only lists the differences from
+the original ROM. A patcher reads your clean ROM and the patch, and writes a new, patched
+`.gba` for you to play. Your original ROM is left unchanged. The patch checks the ROM's
+checksum first, so it refuses the wrong game or revision. Building from source (below)
+compiles a complete ROM, but it still needs your clean ROM, both to confirm which game
+and revision you're building and to make the `.bps` from.
+
 Any BPS patcher works. For example:
 
 **Rom Patcher JS (browser, any OS):**
